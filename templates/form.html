@@ -241,6 +241,23 @@
 
 
             try {
+                // First, check if there are files and display them immediately.
+                const files = document.getElementById('images').files;
+                const imagePreviewContainer = document.getElementById('image-preview-container');
+                imagePreviewContainer.innerHTML = ''; // Clear previous previews
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.alt = "Преглед на снимка";
+                        imagePreviewContainer.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                }
+
+
                 const response = await fetch('/generate', {
                     method: 'POST',
                     body: formData // No Content-Type header needed for FormData, browser sets it
@@ -250,8 +267,15 @@
                 document.getElementById('result-container').style.display = 'block';
 
                 if (!response.ok) {
-                    const errorData = await response.json(); // Try to parse error as JSON
-                    throw new Error(errorData.error || `Сървърна грешка: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text(); // Get raw text to debug
+                    console.error('Server returned non-OK response:', response.status, response.statusText, errorText);
+                    try {
+                        const errorData = JSON.parse(errorText); // Try to parse as JSON if it's an error from our Flask app
+                        throw new Error(errorData.error || `Сървърна грешка: ${response.status} ${response.statusText}`);
+                    } catch (jsonError) {
+                        // If it's not JSON, it's probably an HTML error page or unexpected text
+                        throw new Error(`Неизвестна грешка от сървъра. Отговорът не е валиден JSON. (Status: ${response.status}) ${errorText.substring(0, 100)}...`);
+                    }
                 }
 
                 const result = await response.json(); // Expect JSON response
@@ -261,15 +285,6 @@
                 }
 
                 document.getElementById('generated-ad-text').innerHTML = result.generated_ad;
-
-                // Display uploaded images
-                const imagePreviewContainer = document.getElementById('image-preview-container');
-                result.image_urls.forEach(url => {
-                    const img = document.createElement('img');
-                    img.src = url;
-                    img.alt = "Качена снимка";
-                    imagePreviewContainer.appendChild(img);
-                });
 
             } catch (error) {
                 document.getElementById('loading-indicator').style.display = 'none';
