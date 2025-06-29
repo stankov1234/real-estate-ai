@@ -1,81 +1,163 @@
+# Import necessary libraries
 from flask import Flask, request, jsonify, render_template
-import os
-from werkzeug.utils import secure_filename
 import openai
+import os
+from werkzeug.utils import secure_filename # For safe handling of filenames
+import json # To handle JSON responses if needed for structured data
 
-app = Flask(__name__)
+# Initialize the Flask application
+# Use template_folder to explicitly specify where HTML templates are located
+app = Flask(__name__, template_folder='templates')
+
+# Define the folder for uploading images
+# It's crucial this directory exists and is tracked by Git
 UPLOAD_FOLDER = 'static/uploads'
+# Ensure the upload folder exists. This is important for local development.
+# For Render, ensure 'static/uploads' is committed to your GitHub repo (e.g., with a .gitkeep file inside).
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Configure OpenAI API key from environment variables for security
+# Make sure to set OPENAI_API_KEY in your Render environment settings
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Define the application password for authentication
+# In a real-world scenario, consider more secure password management (e.g., hashing, database)
+APP_PASSWORD = "360estate" # The password for your team
+
+# --- Routes for the application ---
 
 @app.route('/')
 def index():
-    return render_template('form.html')
+    """
+    Renders the login page when the root URL is accessed.
+    This is the first page users will see to enter the password.
+    """
+    return render_template('login.html')
+
+@app.route('/login', methods=['POST'])
+def login():
+    """
+    Handles the login form submission.
+    Checks if the entered password matches the APP_PASSWORD.
+    """
+    password = request.form.get("password")
+    if password == APP_PASSWORD:
+        # If password is correct, render the main form for generating ads
+        return render_template('form.html')
+    else:
+        # If password is incorrect, re-render the login page with an error message
+        return render_template('login.html', error=True)
 
 @app.route('/generate', methods=['POST'])
-def generate():
+def generate_ad():
+    """
+    Handles the ad generation form submission.
+    - Saves uploaded images to the UPLOAD_FOLDER.
+    - Constructs a detailed prompt for the AI based on form data.
+    - Calls OpenAI API (GPT-4) to generate the ad text.
+    - Returns the generated ad text and image URLs as a JSON response.
+    """
+    # Extract form data
     data = request.form
 
-    # Запазване на снимките
+    # Save uploaded images
     image_files = request.files.getlist('images')
     image_urls = []
     for image in image_files:
-        if image:
+        if image and allowed_file(image.filename):
             filename = secure_filename(image.filename)
             path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             image.save(path)
+            # Store the URL relative to the static folder for display
             image_urls.append(f'/static/uploads/{filename}')
 
-    # Сглобяване на вход за AI
+    # Construct the detailed prompt for the AI based on the provided data
+    # This prompt incorporates all the refined phrases and structures we discussed
     prompt = f"""
-    Създай убедителна, емоционално въздействаща и професионална обява за продажба на имот по следните данни:
-    - Локация: {data.get('location')}
-    - Цена: {data.get('price')} €
-    - Площ: {data.get('area')} кв.м
-    - Етаж: {data.get('floor')}
-    - Година на строеж: {data.get('year_built')}
-    - Месечна вноска: {data.get('installment')} € чрез банков кредит
-    - Обзавеждане: {data.get('furnishing')}
-    - Панорама: {data.get('panorama')}
-    - Асансьор: {data.get('elevator')}
-    - Гараж: {data.get('garage')}
-    - Ексклузивност: {data.get('exclusive')}
-    - Финансиране: {data.get('financing')}
-    - Уникални предимства: {data.get('unique_features')}
+Създай уникална, убедителна и емоционално въздействаща обява за продажба на имот, съобразена с Facebook Marketplace. Използвай емотикони, кратки параграфи и изразителен стил.
 
-    Обявата трябва да включва:
-    1. Заглавие (в стила на "Купи за 580 €/месец – Напълно обзаведен, с панорама")
-    2. Встъпителен абзац с кратко описание и ключовите предимства
-    3. Подробности за апартамента
-    4. Финансиране: включително фразата:
-       "✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {data.get('installment')} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението."
-    5. Призив за действие с телефон за връзка: 0896 804 359
-    6. Ясен, подреден и четим формат
-    """
+Данни за имота:
+📌 Локация: {data.get('location', 'неуточнена')}
+💰 Цена: {data.get('price', 'неуточнена')} €
+📐 Площ: {data.get('area', 'неуточнена')} кв.м
+🏢 Етаж: {data.get('floor', 'неуточнен')}
+🏗️ Година на строеж: {data.get('year_built', 'неуточнена')}
+💳 Месечна вноска: {data.get('installment', 'неуточнена')} €
+🛋️ Обзавеждане: {data.get('furnishing', 'неуточнено')}
+🌄 Панорама: {data.get('panorama', 'неуточнена')}
+🛗 Асансьор: {data.get('elevator', 'неуточнен')}
+🚗 Гараж: {data.get('garage', 'неуточнен')}
+💼 Ексклузивност: {data.get('exclusive', 'неуточнена')}
+🏦 Финансиране: {data.get('financing', 'неуточнено')}
+🖼️ Уникални предимства: {data.get('unique_features', 'неуточнени')}
+
+Обявата трябва да включва:
+1.  **Заглавие:** Кратко, ударно и подканващо (напр. "💥 Купи за {data.get('installment')} €/месец – {data.get('furnishing', 'обзаведен')}, {data.get('panorama', 'с панорама')}").
+2.  **Основен текст:**
+    * Встъпителен абзац, който грабва вниманието и представя ключови ползи.
+    * Ясно и емоционално описание на възможностите за финансиране:
+        "✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {data.get('installment', 'ХХХ')} €."
+        "🔓 Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране."
+        "📌 Финансирането не е пречка – то е част от решението."
+    * Подробности за разпределение, характеристики и предимства на имота.
+    * Информация за локацията и предимствата на квартала.
+    * Раздел "Защо с 360ESTATE?" с акцент върху професионална подкрепа, сигурност и улеснение.
+    * Призив за действие с телефон за връзка: 0896 804 359 и опция за лично съобщение.
+3.  **Формат:** Използвай емотикони, нови редове и кратки параграфи за лесна четимост.
+"""
+
+    generated_ad = "Възникна грешка при генерирането на обявата."
+    error_message = None
 
     try:
+        # Check if OpenAI API key is available
+        if not openai.api_key:
+            raise ValueError("OpenAI API ключът не е настроен. Моля, задайте го в променливите на средата.")
+
+        # Call OpenAI Chat Completion API
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4", # Using GPT-4 as requested
             messages=[
-                {"role": "system", "content": "Ти си експерт по имотни обяви."},
+                {"role": "system", "content": "Ти си експерт по имотни обяви и маркетинг за недвижими имоти."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.8,
-            max_tokens=1200
+            temperature=0.8, # Controls creativity (0.8 is a good balance)
+            max_tokens=1200 # Max length of the generated response
         )
+        generated_ad = response.choices[0].message['content'].strip()
 
-        generated_ad = response.choices[0].message.content.strip()
-
+    except openai.error.OpenAIError as e:
+        error_message = f"AI грешка: Проблем с OpenAI API: {str(e)}. Моля, проверете API ключа и лимитите си."
+        print(error_message) # Log error for debugging
+        return jsonify({"error": error_message}), 500
+    except ValueError as e:
+        error_message = f"Конфигурационна грешка: {str(e)}"
+        print(error_message) # Log error
+        return jsonify({"error": error_message}), 500
     except Exception as e:
-        return jsonify({"error": f"AI грешка: {str(e)}"}), 500
+        error_message = f"Неочаквана грешка: {str(e)}"
+        print(error_message) # Log any other unexpected errors
+        return jsonify({"error": error_message}), 500
 
+    # Return the generated ad text and image URLs as JSON
     return jsonify({
         'generated_ad': generated_ad,
         'image_urls': image_urls
     })
 
+def allowed_file(filename):
+    """
+    Helper function to validate allowed file extensions for uploads.
+    """
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Main entry point for the Flask application
+# When running locally, this will start the development server
+# For production (Render), Gunicorn will handle this part,
+# but it's good practice to keep it for local testing.
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True) # debug=True allows for automatic reloading and error messages
 
