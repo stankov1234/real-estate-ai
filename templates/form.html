@@ -450,19 +450,57 @@
             document.getElementById('generated-long-ad-text').innerHTML = '';
             document.getElementById('generatePdfButton').style.display = 'none'; // Hide PDF button initially
 
-            // Read images as base64 and display previews
+            // Resize and read images as base64 and display previews
             const readFilePromises = [];
+            const MAX_SIZE = 1024; // Max width/height of the resized image
+            const QUALITY = 0.7; // JPEG quality (0 to 1)
+
             for (let i = 0; i < imageFiles.length; i++) {
                 const file = imageFiles[i];
-                const reader = new FileReader();
+                if (!file.type.startsWith('image/')) {
+                    console.warn(`Skipping non-image file: ${file.name}`);
+                    continue;
+                }
+
                 readFilePromises.push(new Promise((resolve) => {
+                    const reader = new FileReader();
                     reader.onload = (e) => {
-                        base64Images.push(e.target.result);
-                        const img = document.createElement('img');
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+
+                            // Calculate new dimensions
+                            if (width > height) {
+                                if (width > MAX_SIZE) {
+                                    height *= MAX_SIZE / width;
+                                    width = MAX_SIZE;
+                                }
+                            } else {
+                                if (height > MAX_SIZE) {
+                                    width *= MAX_SIZE / height;
+                                    height = MAX_SIZE;
+                                }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            // Convert to base64 (JPEG for better compression)
+                            const resizedBase64 = canvas.toDataURL('image/jpeg', QUALITY);
+                            base64Images.push(resizedBase64);
+
+                            // Display preview (for user feedback)
+                            const previewImg = document.createElement('img');
+                            previewImg.src = resizedBase64;
+                            previewImg.alt = "Преглед на снимка";
+                            imagePreviewContainer.appendChild(previewImg);
+                            resolve();
+                        };
                         img.src = e.target.result;
-                        img.alt = "Преглед на снимка";
-                        imagePreviewContainer.appendChild(img);
-                        resolve();
                     };
                     reader.readAsDataURL(file);
                 }));
@@ -505,7 +543,7 @@
 
                 // Store for PDF generation
                 currentLongAdText = result.long_ad;
-                currentImagesForPdf = result.images_for_pdf; // These are the base64 strings
+                currentImagesForPdf = base64Images; // Use the resized base64 images for PDF
                 
                 document.getElementById('generatePdfButton').style.display = 'block'; // Show PDF button
 
@@ -591,3 +629,4 @@
     </script>
 </body>
 </html>
+
