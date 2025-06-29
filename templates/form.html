@@ -1,42 +1,53 @@
-
 <!DOCTYPE html>
 <html lang="bg">
 <head>
   <meta charset="UTF-8">
-  <title>Създаване на обява</title>
+  <title>Генерирай обява за имот</title>
 </head>
 <body>
   <h2>Генерирай обява за имот</h2>
-  <form id="adForm">
-    <input name="title" placeholder="Заглавие" required /><br/>
-    <input name="location" placeholder="Локация" required /><br/>
-    <input name="price" placeholder="Цена (€)" required /><br/>
-    <input name="area" placeholder="Площ (кв.м)" required /><br/>
-    <input name="floor" placeholder="Етаж" required /><br/>
-    <input name="year_built" placeholder="Година на строеж" required /><br/>
-    <input name="installment" placeholder="Месечна вноска (€)" required /><br/>
-    <input name="furnishing" placeholder="Обзавеждане" /><br/>
-    <input name="panorama" placeholder="Панорама" /><br/>
-    <input name="elevator" placeholder="Асансьор" /><br/>
-    <input name="garage" placeholder="Гараж" /><br/>
-    <input name="exclusive" placeholder="Ексклузивност" /><br/>
-    <input name="financing" placeholder="Финансиране" /><br/>
-    <textarea name="unique_features" placeholder="Уникални предимства"></textarea><br/>
+  <form id="adform" enctype="multipart/form-data" method="POST">
+    <input name="title" placeholder="Заглавие" required /><br>
+    <input name="location" placeholder="Локация" required /><br>
+    <input name="price" placeholder="Цена (€)" required /><br>
+    <input name="area" placeholder="Площ (кв.м)" required /><br>
+    <input name="floor" placeholder="Етаж" /><br>
+    <input name="year_built" placeholder="Година на строеж" /><br>
+    <input name="installment" placeholder="Месечна вноска (€)" /><br>
+    <input name="furnishing" placeholder="Обзавеждане" /><br>
+    <input name="panorama" placeholder="Панорама" /><br>
+    <input name="elevator" placeholder="Асансьор" /><br>
+    <input name="garage" placeholder="Гараж" /><br>
+    <input name="exclusive" placeholder="Ексклузивност" /><br>
+    <input name="financing" placeholder="Финансиране" /><br>
+    <textarea name="unique_features" placeholder="Уникални предимства"></textarea><br><br>
+
+    <label>Качи снимки:</label><br>
+    <input type="file" name="images" accept="image/*" multiple /><br><br>
+
     <button type="submit">Генерирай</button>
   </form>
-  <div id="result"></div>
+
+  <div id="result" style="margin-top:20px;"></div>
+
   <script>
-    document.getElementById('adForm').addEventListener('submit', async (e) => {
+    document.getElementById('adform').addEventListener('submit', async function (e) {
       e.preventDefault();
-      const form = e.target;
-      const data = Object.fromEntries(new FormData(form).entries());
+
+      const form = document.getElementById('adform');
+      const formData = new FormData(form);
+
       const res = await fetch('/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: formData
       });
+
       const json = await res.json();
-      document.getElementById('result').textContent = json.generated_ad;
+      document.getElementById('result').innerHTML = `
+        <h3>Генерирана обява:</h3>
+        <p>${json.generated_ad}</p>
+        ${json.image_urls.map(url => `<img src="${url}" width="200" style="margin:10px;">`).join('')}
+      `;
     });
   </script>
 </body>
