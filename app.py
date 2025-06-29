@@ -1,5 +1,5 @@
 # Import necessary libraries
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 import openai
 import os
 from werkzeug.utils import secure_filename # For safe handling of filenames
@@ -7,7 +7,7 @@ import json # To handle JSON responses if needed for structured data
 
 # Initialize the Flask application
 # Use template_folder to explicitly specify where HTML templates are located
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # Define the folder for uploading images
 # It's crucial this directory exists and is tracked by Git
@@ -58,6 +58,8 @@ def generate_ad():
     - Calls OpenAI API (GPT-4) to generate the ad text.
     - Returns the generated ad text and image URLs as a JSON response.
     """
+    print("DEBUG: generate_ad route hit!") # Debug print
+
     # Extract form data
     data = request.form
 
@@ -69,13 +71,15 @@ def generate_ad():
             filename = secure_filename(image.filename)
             path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             try:
+                print(f"DEBUG: Attempting to save image to {path}") # Debug print
                 image.save(path)
                 # Store the URL relative to the static folder for display
                 image_urls.append(f'/static/uploads/{filename}')
+                print(f"DEBUG: Image saved: {filename}") # Debug print
             except Exception as e:
-                print(f"Error saving image {filename}: {e}")
-                # Optionally, you might want to return an error or skip this image
-                pass
+                print(f"DEBUG ERROR: Failed to save image {filename}: {e}")
+                # If saving fails, we should still try to generate ad, but without this image
+                pass # Continue processing even if one image fails to save
 
     # Construct the detailed prompt for the AI based on the provided data
     # This prompt incorporates all the refined phrases and structures we discussed
@@ -118,7 +122,10 @@ def generate_ad():
     try:
         # Check if OpenAI API key is available
         if not openai.api_key:
+            print("DEBUG ERROR: OpenAI API key is NOT set.") # Debug print
             raise ValueError("OpenAI API ключът не е настроен. Моля, задайте го в променливите на средата.")
+
+        print(f"DEBUG: OpenAI API key present: {bool(openai.api_key)}") # Debug print
 
         # Call OpenAI Chat Completion API
         response = openai.ChatCompletion.create(
@@ -131,20 +138,22 @@ def generate_ad():
             max_tokens=1200 # Max length of the generated response
         )
         generated_ad = response.choices[0].message['content'].strip()
+        print(f"DEBUG: OpenAI Response received. Generated ad length: {len(generated_ad)}") # Debug print
 
     except openai.error.OpenAIError as e:
         error_message = f"AI грешка: Проблем с OpenAI API: {str(e)}. Моля, проверете API ключа и лимитите си."
-        print(error_message) # Log error for debugging
+        print(f"DEBUG ERROR: OpenAI API Error: {error_message}") # Log error for debugging
         return jsonify({"error": error_message}), 500
     except ValueError as e:
         error_message = f"Конфигурационна грешка: {str(e)}"
-        print(error_message) # Log error
+        print(f"DEBUG ERROR: ValueError: {error_message}") # Log error
         return jsonify({"error": error_message}), 500
     except Exception as e:
         error_message = f"Неочаквана грешка: {str(e)}"
-        print(error_message) # Log any other unexpected errors
+        print(f"DEBUG ERROR: Generic Exception in generate_ad: {error_message}") # Log any other unexpected errors
         return jsonify({"error": error_message}), 500
 
+    print(f"DEBUG: Returning JSON response. Image URLs count: {len(image_urls)}") # Debug print
     # Return the generated ad text and image URLs as JSON
     return jsonify({
         'generated_ad': generated_ad,
@@ -159,11 +168,18 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Serve static files (images)
+@app.route('/static/uploads/<filename>')
+def uploaded_file(filename):
+    """
+    Route to serve uploaded images.
+    """
+    print(f"DEBUG: Serving static file: {filename} from {app.config['UPLOAD_FOLDER']}") # Debug print
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 # Main entry point for the Flask application
 # When running locally, this will start the development server
 # For production (Render), Gunicorn will handle this part,
 # but it's good practice to keep it for local testing.
 if __name__ == '__main__':
     app.run(debug=True) # debug=True allows for automatic reloading and error messages
-
-
