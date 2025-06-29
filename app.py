@@ -5,19 +5,23 @@ import base64
 from io import BytesIO 
 import re 
 
-from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
+from flask import Flask, request, jsonify, render_template, send_from_directory # send_file and Image removed
 import openai
 from werkzeug.utils import secure_filename
 
-# Import ReportLab for PDF generation
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.pagesizes import A4, portrait
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+# ReportLab imports removed as PDF generation is removed
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# from reportlab.lib.pagesizes import A4, portrait
+# from reportlab.lib.units import inch
+# from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-# Import platform to check OS for font path (optional, for local development specific fonts)
-import platform
+# platform import removed as it was primarily for PDF font paths
+# import platform
+
+# For Cyrillic font in ReportLab - no longer needed
+# from reportlab.pdfbase import pdfmetrics
+# from reportlab.pdfbase.ttfonts import TTFont
 
 # Initialize the Flask application
 app = Flask(__name__, template_folder='templates', static_folder='static')
@@ -96,7 +100,7 @@ def generate_ad():
         'income_potential': data.get('income_potential', ''),
     }
 
-    # Extract base64 image data
+    # Extract base64 image data (still used by AI for vision)
     image_data_base64 = data.get('images', [])
 
     generated_short_ad = "Възникна грешка при генерирането на кратката обява."
@@ -110,8 +114,10 @@ def generate_ad():
         print("DEBUG: OpenAI client is ready for vision model.")
 
         # Construct basic text prompt based on property type and all available data
+        # IMPORTANT: The prompt below is structured to strictly adhere to the desired output format.
+        # It uses explicit markers and instructions for each section.
         base_text_prompt = f"""
-Ти си експерт по имотни обяви и маркетинг за недвижими имоти. Твоята задача е да създадеш ДВЕ ВЕРСИИ на обява за продажба на имот, съобразена с Facebook Marketplace:
+Ти си експерт по имотни обяви и маркетинг за недвижими и имоти. Твоята задача е да създадеш ДВЕ ВЕРСИИ на обява за продажба на имот, съобразена с Facebook Marketplace:
 1.  **КРАТКА ВЕРСИЯ:** Много сбита, акцентираща на основните предимства, подходяща за бързо сканиране.
 2.  **ДЪЛГА ВЕРСИЯ:** Подробна и описателна, с повече детайли за всички характеристики.
 
@@ -160,26 +166,27 @@ def generate_ad():
 
 ---ДЪЛГА ОБЯВА START---
 💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]
-[Емоционален встъпителен абзац, представящ най-големите ползи.]
-Ключови Характеристики (Резюме):
+[Емоционален встъпителен абзац, който грабва вниманието и представя най-големите ползи, специфични за типа имот.]
+**Ключови Характеристики (Резюме):**
 📐 Площ: {form_data['area']} кв.м | 💰 Цена: {form_data['price']} € | 📍 Локация: {form_data['location']} | 🛋️ Обзавеждане: {form_data['furnishing']}
 [Подробно описание на {form_data['property_type']}, неговото разпределение, състояние, характеристики и предимства, извлечени от снимките и данните.]
 [Информация за локацията и предимствата на квартала/района, специфични за {form_data['property_type']}.]
-Защо с 360ESTATE?:
+**Допълнително:**
+[Включи всички други важни, но незадължителни характеристики, въведени от брокера (напр. включено мазе, тухлена сграда, етаж, опция за гараж).]
+**Защо с 360ESTATE?:**
 [Акцент върху професионална подкрепа, сигурност и улеснение.]
-Идеален избор за:
+**Идеален избор за:**
 [2-3 подходящи групи (напр. Младо семейство, Инвестиция с висока доходност).]
 ✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {form_data['installment']} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението.
 📞 За оглед: {form_data['broker_name']} – {form_data['broker_phone']}
 [Генерирай подходящи хаштагове за {form_data['property_type']} и локацията.]
+[Генерирай кратко, емоционално заключение, което да остави силно впечатление (напр. "Тук не просто купувате апартамент – купувате стил на живот.").]
 ---ДЪЛГА ОБЯВА END---
 """
         messages_content = [{"type": "text", "text": base_text_prompt}]
 
         # Add image URLs to the messages_content if available
         for img_b64 in image_data_base64:
-            # ReportLab only supports JPEG, PNG, GIF, BMP. Check image type if possible.
-            # For simplicity, we just pass the base64 string directly
             messages_content.append({"type": "image_url", "image_url": {"url": img_b64}})
 
         response = client.chat.completions.create(
@@ -233,205 +240,10 @@ def generate_ad():
         'images_for_pdf': image_data_base64 # Pass base64 images to frontend for PDF generation
     })
 
-@app.route('/generate_pdf', methods=['POST'])
-def generate_pdf():
-    print("DEBUG: generate_pdf route hit!")
-    data = request.json
-    ad_text = data.get('ad_text', 'Няма текст за обявата.')
-    images_b64 = data.get('images_for_pdf', [])
-    
-    buffer = BytesIO()
-    # Use portrait(A4) for standard portrait orientation
-    doc = SimpleDocTemplate(buffer, pagesize=portrait(A4),
-                            leftMargin=0.75*inch, rightMargin=0.75*inch,
-                            topMargin=0.75*inch, bottomMargin=0.75*inch)
-    
-    styles = getSampleStyleSheet()
-
-    # Register a font that supports Cyrillic characters
-    # This requires the font file to be available on the Render server.
-    # Common cross-platform fonts: DejaVu Sans, Liberation Sans, or Noto Sans.
-    # For simplicity and common availability in Linux environments (like Render),
-    # we'll try to register DejaVuSans.
-    # On Render, you might need to ensure these fonts are present in the build environment.
-    # A robust solution often involves bundling the font files with your app.
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-
-    # Attempt to register a common font with Cyrillic support
-    # You might need to upload this .ttf file to your project and adjust the path
-    # For Render, a common strategy is to place fonts in a 'fonts' directory within your app.
-    try:
-        # Example path if you bundle the font in a 'fonts' folder in your root project
-        font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'DejaVuSans.ttf')
-        if not os.path.exists(font_path):
-            # Fallback to system path or commonly available paths on Linux (like Render's base image)
-            # This is less reliable without bundling.
-            # On Render, fonts like DejaVuSans might be in /usr/share/fonts/truetype/dejavu/
-            # For a guaranteed solution, bundle DejaVuSans.ttf in your 'fonts' folder.
-            print("DEBUG: DejaVuSans.ttf not found in app's fonts folder. Trying system path.")
-            if platform.system() == "Linux":
-                font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" # Common path on Linux
-            else:
-                font_path = "DejaVuSans.ttf" # Fallback, might not work
-                
-        if os.path.exists(font_path):
-            pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
-            pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', font_path)) # Register bold if available
-            styles.add(ParagraphStyle(name='CyrillicNormal', parent=styles['Normal'], fontName='DejaVuSans', fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
-            styles.add(ParagraphStyle(name='CyrillicBold', parent=styles['h2'], fontName='DejaVuSans-Bold', fontSize=12, leading=14, alignment=TA_LEFT))
-            styles.add(ParagraphStyle(name='CyrillicTitle', parent=styles['h1'], fontName='DejaVuSans-Bold', fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
-            styles.add(ParagraphStyle(name='CyrillicImageCaption', parent=styles['Normal'], fontName='DejaVuSans', fontSize=8, alignment=TA_CENTER, spaceAfter=6))
-            styles.add(ParagraphStyle(name='CyrillicBullet', parent=styles['Normal'], fontName='DejaVuSans', fontSize=10, leading=14, spaceAfter=2, leftIndent=36))
-
-            # Update default styles to use Cyrillic-compatible fonts
-            styles['Normal'].fontName = 'DejaVuSans'
-            styles['h1'].fontName = 'DejaVuSans-Bold'
-            styles['h2'].fontName = 'DejaVuSans-Bold'
-            styles['Bullet'].fontName = 'DejaVuSans'
-            
-            # Update custom styles to use Cyrillic-compatible fonts
-            styles.add(ParagraphStyle(name='AdTitle', parent=styles['CyrillicTitle']))
-            styles.add(ParagraphStyle(name='AdBody', parent=styles['CyrillicNormal']))
-            styles.add(ParagraphStyle(name='ImageCaption', parent=styles['CyrillicImageCaption']))
-            styles.add(ParagraphStyle(name='BulletPoint', parent=styles['CyrillicBullet']))
-
-            print("DEBUG: DejaVuSans font registered successfully.")
-        else:
-            print(f"DEBUG ERROR: DejaVuSans.ttf not found at {font_path}. Cyrillic might not display correctly.")
-            # Fallback to default fonts if DejaVuSans is not found
-            styles.add(ParagraphStyle(name='AdTitle', parent=styles['h1'], fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
-            styles.add(ParagraphStyle(name='AdBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
-            styles.add(ParagraphStyle(name='ImageCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, spaceAfter=6))
-            styles.add(ParagraphStyle(name='BulletPoint', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=2, leftIndent=36))
-
-    except Exception as e:
-        print(f"DEBUG ERROR: Failed to register font: {e}. Cyrillic might not display correctly.")
-        # Fallback to default fonts if font registration fails
-        styles.add(ParagraphStyle(name='AdTitle', parent=styles['h1'], fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
-        styles.add(ParagraphStyle(name='AdBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
-        styles.add(ParagraphStyle(name='ImageCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, spaceAfter=6))
-        styles.add(ParagraphStyle(name='BulletPoint', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=2, leftIndent=36))
-
-
-    story = []
-
-    story.append(Paragraph("<b><font size=16>Генерирана Обява от 360ESTATE</font></b>", styles['AdTitle']))
-    story.append(Spacer(1, 0.2 * inch))
-
-    # Add ad text
-    lines = ad_text.split('\n')
-    for line in lines:
-        line = line.strip()
-        if not line: # Empty line
-            story.append(Spacer(1, 0.1 * inch))
-            continue
-
-        # Convert markdown bold/italic/underline to ReportLab's RML
-        formatted_line = line
-        
-        # Regex to replace markdown bold (**text** or __text__)
-        formatted_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', formatted_line)
-        formatted_line = re.sub(r'__(.*?)__', r'<b>\1</b>', formatted_line)
-        
-        # Regex to replace markdown italic (*text* or _text_) - ReportLab needs <i>
-        formatted_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', formatted_line)
-        formatted_line = re.sub(r'_(.*?)_', r'<i>\1</i>', formatted_line)
-
-        # Replace common emojis with their text equivalents for PDF compatibility
-        emoji_map = {
-            '💥': 'Взрив: ', '✨': 'Звезда: ', '🔓': 'Отключено: ', '📌': 'Пин: ', '📞': 'Телефон: ',
-            '✅': 'ОК: ', '🏡': 'Къща: ', '📐': 'Площ: ', '💰': 'Пари: ', '📍': 'Локация: ',
-            '🛋️': 'Мебели: ', '🌳': 'Дърво: ', '🏊': 'Басейн: ', '🚗': 'Кола: ', '🔥': 'Огън: ',
-            '🏞️': 'Пейзаж: ', '💧': 'Вода: ', '⚡': 'Ел.: ', '🛣️': 'Път: ', '🛍️': 'Магазин: ',
-            '📈': 'Графика: ', '🚶‍♂️': 'Човек: ', '🏗️': 'Строеж: ', '🏘️': 'Сгради: ', '🎯': 'Цел: ',
-            '💡': 'Идея: ', '🛗': 'Асансьор: ', '🛌': 'Спалня: ', '🛀': 'Баня: ', '🍽️': 'Кухня: ',
-            '🌿': 'Растение: ', '🏢': 'Сграда: ', '🔑': 'Ключ: ', '☀️': 'Слънце: ', '🌊': 'Вълни: '
-        }
-        for emoji, text_eq in emoji_map.items():
-            formatted_line = formatted_line.replace(emoji, text_eq)
-        
-        # Remove any other complex unicode/emojis that might cause issues and are not in map
-        # This is a broad approach to prevent errors.
-        formatted_line = formatted_line.encode('ascii', 'ignore').decode('ascii')
-
-
-        # Handle list items for bullet points
-        if formatted_line.startswith('• ') or formatted_line.startswith('- ') or formatted_line.startswith('* '):
-            story.append(Paragraph(formatted_line, styles['BulletPoint']))
-        elif formatted_line.startswith('ОК: '): # Handle emojis replaced by text_eq like 'ОК: '
-            story.append(Paragraph(f'• {formatted_line[4:]}', styles['BulletPoint']))
-        else:
-            story.append(Paragraph(formatted_line, styles['AdBody']))
-
-    story.append(Spacer(1, 0.2 * inch)) # Reduced space after text
-
-    # Add images
-    if images_b64:
-        # Max height for all images combined to try to fit on one page
-        # A4 height (842 points) - top/bottom margins (2*0.75*72 points = 108) - text height (estimated 200-300) = remaining height
-        # Remaining height approx 400-500 points
-        max_total_images_height = (portrait(A4)[1] - (2 * 0.75 * inch) - (len(story) * 14)) * 0.6 # Adjust multiplier for content space
-        current_images_height = 0
-        
-        story.append(Paragraph("<b>Прикачени изображения:</b>", styles['CyrillicBold'] if 'CyrillicBold' in styles else styles['h2']))
-        story.append(Spacer(1, 0.1 * inch)) # Reduced space
-
-        for i, img_b64 in enumerate(images_b64):
-            try:
-                # Remove data:image/png;base64, or similar prefix
-                header, base64_string = img_b64.split(',', 1)
-                img_data = base64.b64decode(base64_string)
-                img = Image(BytesIO(img_data))
-                
-                # Scale image to fit page width, maintaining aspect ratio
-                max_img_width = A4[0] - 1.5 * inch # A4 width minus side margins (0.75 inch each side)
-                
-                img_width = img.drawWidth
-                img_height = img.drawHeight
-                
-                if img_width > max_img_width:
-                    scale_factor = max_img_width / img_width
-                    img_width = max_img_width
-                    img_height = img_height * scale_factor
-                
-                # Further scale height if it's still too large for total page space (and for single image display)
-                # Max height for a single image, try to balance for multiple images
-                max_single_img_height = 2.5 * inch # Reduced max single image height
-                if img_height > max_single_img_height:
-                    scale_factor = max_single_img_height / img_height
-                    img_width = img_width * scale_factor
-                    img_height = max_single_img_height
-                
-                # Check if adding this image exceeds total allowed height (and if it's the last one)
-                if (current_images_height + img_height + (0.1 * inch * 2) > max_total_images_height) and (i < len(images_b64) - 1):
-                    # If this image would overflow AND it's not the last image,
-                    # consider adding it to a new page or reducing more.
-                    # For "fit on one page", we might need to skip some images or dramatically scale down.
-                    # For now, if it overflows, it will just go to next page, but overall smaller.
-                    pass 
-
-                img.drawWidth = img_width
-                img.drawHeight = img_height
-                
-                story.append(img)
-                story.append(Paragraph(f"<i>Снимка {i+1}</i>", styles['ImageCaption']))
-                story.append(Spacer(1, 0.1 * inch))
-                current_images_height += img_height + (0.1 * inch * 2) # Update current height
-
-            except Exception as e:
-                print(f"DEBUG ERROR: Failed to embed image {i+1} in PDF: {e}")
-                story.append(Paragraph(f"<i>Неуспешно зареждане на снимка {i+1}</i>", styles['ImageCaption']))
-                story.append(Spacer(1, 0.1 * inch))
-
-    try:
-        # Build the PDF
-        doc.build(story)
-        buffer.seek(0)
-        return send_file(buffer, as_attachment=True, download_name='Obyava_za_Imot.pdf', mimetype='application/pdf')
-    except Exception as e:
-        print(f"DEBUG ERROR: Failed to build PDF: {e}")
-        return jsonify({"error": f"Грешка при генериране на PDF: {str(e)}"}), 500
+# The /generate_pdf route and all its dependencies are removed.
+# @app.route('/generate_pdf', methods=['POST'])
+# def generate_pdf():
+#    ... (removed code) ...
 
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
