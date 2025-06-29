@@ -2,8 +2,8 @@
 import os
 import json
 import base64
-from io import BytesIO # To handle image data in memory
-import re # Import regular expressions for robust text processing
+from io import BytesIO 
+import re 
 
 from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 import openai
@@ -12,9 +12,12 @@ from werkzeug.utils import secure_filename
 # Import ReportLab for PDF generation
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, portrait
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+# Import platform to check OS for font path (optional, for local development specific fonts)
+import platform
 
 # Initialize the Flask application
 app = Flask(__name__, template_folder='templates', static_folder='static')
@@ -175,6 +178,8 @@ def generate_ad():
 
         # Add image URLs to the messages_content if available
         for img_b64 in image_data_base64:
+            # ReportLab only supports JPEG, PNG, GIF, BMP. Check image type if possible.
+            # For simplicity, we just pass the base64 string directly
             messages_content.append({"type": "image_url", "image_url": {"url": img_b64}})
 
         response = client.chat.completions.create(
@@ -236,14 +241,78 @@ def generate_pdf():
     images_b64 = data.get('images_for_pdf', [])
     
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    styles = getSampleStyleSheet()
+    # Use portrait(A4) for standard portrait orientation
+    doc = SimpleDocTemplate(buffer, pagesize=portrait(A4),
+                            leftMargin=0.75*inch, rightMargin=0.75*inch,
+                            topMargin=0.75*inch, bottomMargin=0.75*inch)
     
-    # Custom style for title and body
-    styles.add(ParagraphStyle(name='AdTitle', parent=styles['h1'], fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
-    styles.add(ParagraphStyle(name='AdBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
-    styles.add(ParagraphStyle(name='ImageCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, spaceAfter=6))
-    styles.add(ParagraphStyle(name='BulletPoint', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=2, leftIndent=36)) # For list items
+    styles = getSampleStyleSheet()
+
+    # Register a font that supports Cyrillic characters
+    # This requires the font file to be available on the Render server.
+    # Common cross-platform fonts: DejaVu Sans, Liberation Sans, or Noto Sans.
+    # For simplicity and common availability in Linux environments (like Render),
+    # we'll try to register DejaVuSans.
+    # On Render, you might need to ensure these fonts are present in the build environment.
+    # A robust solution often involves bundling the font files with your app.
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    # Attempt to register a common font with Cyrillic support
+    # You might need to upload this .ttf file to your project and adjust the path
+    # For Render, a common strategy is to place fonts in a 'fonts' directory within your app.
+    try:
+        # Example path if you bundle the font in a 'fonts' folder in your root project
+        font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'DejaVuSans.ttf')
+        if not os.path.exists(font_path):
+            # Fallback to system path or commonly available paths on Linux (like Render's base image)
+            # This is less reliable without bundling.
+            # On Render, fonts like DejaVuSans might be in /usr/share/fonts/truetype/dejavu/
+            # For a guaranteed solution, bundle DejaVuSans.ttf in your 'fonts' folder.
+            print("DEBUG: DejaVuSans.ttf not found in app's fonts folder. Trying system path.")
+            if platform.system() == "Linux":
+                font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" # Common path on Linux
+            else:
+                font_path = "DejaVuSans.ttf" # Fallback, might not work
+                
+        if os.path.exists(font_path):
+            pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+            pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', font_path)) # Register bold if available
+            styles.add(ParagraphStyle(name='CyrillicNormal', parent=styles['Normal'], fontName='DejaVuSans', fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
+            styles.add(ParagraphStyle(name='CyrillicBold', parent=styles['h2'], fontName='DejaVuSans-Bold', fontSize=12, leading=14, alignment=TA_LEFT))
+            styles.add(ParagraphStyle(name='CyrillicTitle', parent=styles['h1'], fontName='DejaVuSans-Bold', fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
+            styles.add(ParagraphStyle(name='CyrillicImageCaption', parent=styles['Normal'], fontName='DejaVuSans', fontSize=8, alignment=TA_CENTER, spaceAfter=6))
+            styles.add(ParagraphStyle(name='CyrillicBullet', parent=styles['Normal'], fontName='DejaVuSans', fontSize=10, leading=14, spaceAfter=2, leftIndent=36))
+
+            # Update default styles to use Cyrillic-compatible fonts
+            styles['Normal'].fontName = 'DejaVuSans'
+            styles['h1'].fontName = 'DejaVuSans-Bold'
+            styles['h2'].fontName = 'DejaVuSans-Bold'
+            styles['Bullet'].fontName = 'DejaVuSans'
+            
+            # Update custom styles to use Cyrillic-compatible fonts
+            styles.add(ParagraphStyle(name='AdTitle', parent=styles['CyrillicTitle']))
+            styles.add(ParagraphStyle(name='AdBody', parent=styles['CyrillicNormal']))
+            styles.add(ParagraphStyle(name='ImageCaption', parent=styles['CyrillicImageCaption']))
+            styles.add(ParagraphStyle(name='BulletPoint', parent=styles['CyrillicBullet']))
+
+            print("DEBUG: DejaVuSans font registered successfully.")
+        else:
+            print(f"DEBUG ERROR: DejaVuSans.ttf not found at {font_path}. Cyrillic might not display correctly.")
+            # Fallback to default fonts if DejaVuSans is not found
+            styles.add(ParagraphStyle(name='AdTitle', parent=styles['h1'], fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
+            styles.add(ParagraphStyle(name='AdBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
+            styles.add(ParagraphStyle(name='ImageCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, spaceAfter=6))
+            styles.add(ParagraphStyle(name='BulletPoint', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=2, leftIndent=36))
+
+    except Exception as e:
+        print(f"DEBUG ERROR: Failed to register font: {e}. Cyrillic might not display correctly.")
+        # Fallback to default fonts if font registration fails
+        styles.add(ParagraphStyle(name='AdTitle', parent=styles['h1'], fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
+        styles.add(ParagraphStyle(name='AdBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
+        styles.add(ParagraphStyle(name='ImageCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, spaceAfter=6))
+        styles.add(ParagraphStyle(name='BulletPoint', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=2, leftIndent=36))
+
 
     story = []
 
@@ -251,7 +320,6 @@ def generate_pdf():
     story.append(Spacer(1, 0.2 * inch))
 
     # Add ad text
-    # This logic needs to be robust against AI's markdown and unexpected characters.
     lines = ad_text.split('\n')
     for line in lines:
         line = line.strip()
@@ -260,7 +328,6 @@ def generate_pdf():
             continue
 
         # Convert markdown bold/italic/underline to ReportLab's RML
-        # ReportLab markup: <b> bold </b>, <i> italic </i>, <u> underline </u>
         formatted_line = line
         
         # Regex to replace markdown bold (**text** or __text__)
@@ -269,18 +336,17 @@ def generate_pdf():
         
         # Regex to replace markdown italic (*text* or _text_) - ReportLab needs <i>
         formatted_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', formatted_line)
-        formatted_line = re.sub(r'_(.*?)_', r'<i>\1</i>', formatted_line) # Careful with _ if used for spaces
+        formatted_line = re.sub(r'_(.*?)_', r'<i>\1</i>', formatted_line)
 
-        # Replace common emojis with their text equivalents or simplified Unicode for PDF compatibility
-        # ReportLab has limited emoji support with default fonts.
+        # Replace common emojis with their text equivalents for PDF compatibility
         emoji_map = {
-            '💥': '[ВЗРИВ]', '✨': '[ЗВЕЗДА]', '🔓': '[ОТКЛЮЧЕНО]', '📌': '[ПИН]', '📞': '[ТЕЛЕФОН]',
-            '✅': '[ОК]', '🏡': '[КЪЩА]', '📐': '[ПЛОЩ]', '💰': '[ПАРИ]', '📍': '[ЛОКАЦИЯ]',
-            '🛋️': '[МЕБЕЛИ]', '🌳': '[ДЪРВО]', '🏊': '[БАСЕЙН]', '🚗': '[КОЛА]', '🔥': '[ОГЪН]',
-            '🏞️': '[ПЕЙЗАЖ]', '💧': '[ВОДА]', '⚡': '[ЕЛЕКТРИЧЕСТВО]', '🛣️': '[ПЪТ]', '🛍️': '[МАГАЗИН]',
-            '📈': '[ГРАФИКА]', '🚶‍♂️': '[ЧОВЕК]', '🏗️': '[СТРОЕЖ]', '🏘️': '[СГРАДИ]', '🎯': '[ЦЕЛ]',
-            '💡': '[ИДЕЯ]', '🛗': '[АСАНСЬОР]', '🛌': '[СПАЛНЯ]', '🛀': '[БАНЯ]', '🍽️': '[КУХНЯ]',
-            '🌿': '[РАСТЕНИЕ]', '🏢': '[СГРАДА]', '🔑': '[КЛЮЧ]', '☀️': '[СЛЪНЦЕ]', '🌊': '[ВЪЛНИ]'
+            '💥': 'Взрив: ', '✨': 'Звезда: ', '🔓': 'Отключено: ', '📌': 'Пин: ', '📞': 'Телефон: ',
+            '✅': 'ОК: ', '🏡': 'Къща: ', '📐': 'Площ: ', '💰': 'Пари: ', '📍': 'Локация: ',
+            '🛋️': 'Мебели: ', '🌳': 'Дърво: ', '🏊': 'Басейн: ', '🚗': 'Кола: ', '🔥': 'Огън: ',
+            '🏞️': 'Пейзаж: ', '💧': 'Вода: ', '⚡': 'Ел.: ', '🛣️': 'Път: ', '🛍️': 'Магазин: ',
+            '📈': 'Графика: ', '🚶‍♂️': 'Човек: ', '🏗️': 'Строеж: ', '🏘️': 'Сгради: ', '🎯': 'Цел: ',
+            '💡': 'Идея: ', '🛗': 'Асансьор: ', '🛌': 'Спалня: ', '🛀': 'Баня: ', '🍽️': 'Кухня: ',
+            '🌿': 'Растение: ', '🏢': 'Сграда: ', '🔑': 'Ключ: ', '☀️': 'Слънце: ', '🌊': 'Вълни: '
         }
         for emoji, text_eq in emoji_map.items():
             formatted_line = formatted_line.replace(emoji, text_eq)
@@ -290,21 +356,27 @@ def generate_pdf():
         formatted_line = formatted_line.encode('ascii', 'ignore').decode('ascii')
 
 
-        # Handle list items
-        # Check for bullet points generated by AI
+        # Handle list items for bullet points
         if formatted_line.startswith('• ') or formatted_line.startswith('- ') or formatted_line.startswith('* '):
             story.append(Paragraph(formatted_line, styles['BulletPoint']))
-        elif formatted_line.startswith('✅ '):
-            story.append(Paragraph(f'• {formatted_line[2:]}', styles['BulletPoint']))
+        elif formatted_line.startswith('ОК: '): # Handle emojis replaced by text_eq like 'ОК: '
+            story.append(Paragraph(f'• {formatted_line[4:]}', styles['BulletPoint']))
         else:
             story.append(Paragraph(formatted_line, styles['AdBody']))
 
-    story.append(Spacer(1, 0.4 * inch))
+    story.append(Spacer(1, 0.2 * inch)) # Reduced space after text
 
     # Add images
     if images_b64:
-        story.append(Paragraph("<b><font size=12>Прикачени изображения:</font></b>", styles['h2']))
-        story.append(Spacer(1, 0.2 * inch))
+        # Max height for all images combined to try to fit on one page
+        # A4 height (842 points) - top/bottom margins (2*0.75*72 points = 108) - text height (estimated 200-300) = remaining height
+        # Remaining height approx 400-500 points
+        max_total_images_height = (portrait(A4)[1] - (2 * 0.75 * inch) - (len(story) * 14)) * 0.6 # Adjust multiplier for content space
+        current_images_height = 0
+        
+        story.append(Paragraph("<b>Прикачени изображения:</b>", styles['CyrillicBold'] if 'CyrillicBold' in styles else styles['h2']))
+        story.append(Spacer(1, 0.1 * inch)) # Reduced space
+
         for i, img_b64 in enumerate(images_b64):
             try:
                 # Remove data:image/png;base64, or similar prefix
@@ -313,24 +385,31 @@ def generate_pdf():
                 img = Image(BytesIO(img_data))
                 
                 # Scale image to fit page width, maintaining aspect ratio
-                # Assuming A4 width (595 points) and some margins (e.g., 50 points per side)
-                # Image width should be max 495 points (A4 width - 2*50 margins)
+                max_img_width = A4[0] - 1.5 * inch # A4 width minus side margins (0.75 inch each side)
+                
                 img_width = img.drawWidth
                 img_height = img.drawHeight
-                
-                max_img_width = A4[0] - 2 * inch # A4 width minus 2 inches margin
                 
                 if img_width > max_img_width:
                     scale_factor = max_img_width / img_width
                     img_width = max_img_width
                     img_height = img_height * scale_factor
                 
-                # If after scaling width, height is too big, scale based on height (e.g., max 4 inches)
-                max_img_height = 4 * inch
-                if img_height > max_img_height:
-                    scale_factor = max_img_height / img_height
+                # Further scale height if it's still too large for total page space (and for single image display)
+                # Max height for a single image, try to balance for multiple images
+                max_single_img_height = 2.5 * inch # Reduced max single image height
+                if img_height > max_single_img_height:
+                    scale_factor = max_single_img_height / img_height
                     img_width = img_width * scale_factor
-                    img_height = max_img_height
+                    img_height = max_single_img_height
+                
+                # Check if adding this image exceeds total allowed height (and if it's the last one)
+                if (current_images_height + img_height + (0.1 * inch * 2) > max_total_images_height) and (i < len(images_b64) - 1):
+                    # If this image would overflow AND it's not the last image,
+                    # consider adding it to a new page or reducing more.
+                    # For "fit on one page", we might need to skip some images or dramatically scale down.
+                    # For now, if it overflows, it will just go to next page, but overall smaller.
+                    pass 
 
                 img.drawWidth = img_width
                 img.drawHeight = img_height
@@ -338,12 +417,15 @@ def generate_pdf():
                 story.append(img)
                 story.append(Paragraph(f"<i>Снимка {i+1}</i>", styles['ImageCaption']))
                 story.append(Spacer(1, 0.1 * inch))
+                current_images_height += img_height + (0.1 * inch * 2) # Update current height
+
             except Exception as e:
                 print(f"DEBUG ERROR: Failed to embed image {i+1} in PDF: {e}")
                 story.append(Paragraph(f"<i>Неуспешно зареждане на снимка {i+1}</i>", styles['ImageCaption']))
                 story.append(Spacer(1, 0.1 * inch))
 
     try:
+        # Build the PDF
         doc.build(story)
         buffer.seek(0)
         return send_file(buffer, as_attachment=True, download_name='Obyava_za_Imot.pdf', mimetype='application/pdf')
