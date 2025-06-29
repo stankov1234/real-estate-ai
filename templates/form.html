@@ -43,6 +43,7 @@
         input[type="text"],
         input[type="number"],
         textarea,
+        select, /* Added select for property type */
         input[type="file"] {
             width: calc(100% - 2rem);
             padding: 0.75rem 1rem;
@@ -63,6 +64,7 @@
         input[type="text"]:focus,
         input[type="number"]:focus,
         textarea:focus,
+        select:focus,
         input[type="file"]:focus {
             border-color: #63b3ed; /* blue-400 */
         }
@@ -99,7 +101,7 @@
             font-size: 1.2rem;
             display: none; /* Hidden by default */
         }
-        #result-container {
+        .result-section { /* New style for output sections */
             background-color: #2d3748;
             padding: 2rem;
             border-radius: 0.75rem;
@@ -109,13 +111,13 @@
             margin-top: 2rem;
             box-sizing: border-box;
         }
-        #result-container h3 {
+        .result-section h3 {
             color: #e2e8f0;
             margin-bottom: 1rem;
             font-size: 1.5rem;
             text-align: center;
         }
-        #generated-ad-text {
+        .generated-ad-text { /* Changed from ID to class */
             white-space: pre-wrap; /* Preserve line breaks from AI */
             color: #cbd5e0;
             font-size: 1rem;
@@ -148,12 +150,46 @@
             text-align: center;
             font-weight: 500;
         }
+        .copy-button { /* New style for copy buttons */
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            background-color: #48bb78; /* green-500 */
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+            margin-top: 1rem;
+            width: 100%;
+        }
+        .copy-button:hover {
+            background-color: #38a169; /* green-600 */
+            transform: translateY(-2px);
+        }
+        .hidden-field { /* For dynamically hidden fields */
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2><i class="fas fa-home"></i> Генератор на обяви за имоти</h2>
-        <form id="adForm" method="POST"> <!-- Removed enctype="multipart/form-data" -->
+        <form id="adForm" method="POST">
+            <!-- Property Type Selector -->
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="property_type"><i class="fas fa-building"></i> Тип имот:</label>
+                <select id="property_type" name="property_type" required>
+                    <option value="">Избери...</option>
+                    <option value="Апартамент">Апартамент</option>
+                    <option value="Къща">Къща</option>
+                    <option value="Парцел">Парцел</option>
+                    <option value="Магазин/Обект">Магазин/Обект</option>
+                    <option value="Сграда">Сграда</option>
+                </select>
+            </div>
+
+            <!-- Common Fields (always visible) -->
             <div class="form-group">
                 <label for="location"><i class="fas fa-map-marker-alt"></i> Локация:</label>
                 <input type="text" id="location" name="location" placeholder="Квартал, град" required>
@@ -167,16 +203,12 @@
                 <input type="number" id="area" name="area" placeholder="90" required>
             </div>
             <div class="form-group">
-                <label for="floor"><i class="fas fa-layer-group"></i> Етаж:</label>
-                <input type="text" id="floor" name="floor" placeholder="2 / Последен">
-            </div>
-            <div class="form-group">
                 <label for="year_built"><i class="fas fa-calendar-alt"></i> Година на строеж:</label>
                 <input type="number" id="year_built" name="year_built" placeholder="2018">
             </div>
             <div class="form-group">
                 <label for="installment"><i class="fas fa-money-check-alt"></i> Месечна вноска (€):</label>
-                <input type="number" id="installment" name="installment" placeholder="580">
+                <input type="number" id="installment" name="installment" placeholder="580" required>
             </div>
             <div class="form-group">
                 <label for="furnishing"><i class="fas fa-couch"></i> Обзавеждане:</label>
@@ -202,12 +234,6 @@
                 <label for="financing"><i class="fas fa-coins"></i> Финансиране (допълнително инфо):</label>
                 <input type="text" id="financing" name="financing" placeholder="Чрез Банков Ипотечен Кредит">
             </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="unique_features"><i class="fas fa-star"></i> Уникални предимства (свободен текст):</label>
-                <textarea id="unique_features" name="unique_features" placeholder="Просторна дневна, дизайнерски интериор, близост до парк..."></textarea>
-            </div>
-            
-            <!-- New Broker Fields -->
             <div class="form-group">
                 <label for="broker_name"><i class="fas fa-user-tie"></i> Име на брокер:</label>
                 <input type="text" id="broker_name" name="broker_name" placeholder="Станимир Станков" required>
@@ -216,7 +242,90 @@
                 <label for="broker_phone"><i class="fas fa-phone"></i> Телефон на брокер:</label>
                 <input type="text" id="broker_phone" name="broker_phone" placeholder="0896 804 359" required>
             </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="unique_features"><i class="fas fa-star"></i> Уникални предимства (свободен текст):</label>
+                <textarea id="unique_features" name="unique_features" placeholder="Просторна дневна, дизайнерски интериор, близост до парк..."></textarea>
+            </div>
 
+            <!-- Specific fields for APARTMENT / HOUSE -->
+            <div class="form-group apartment house-specific">
+                <label for="floor"><i class="fas fa-layer-group"></i> Етаж:</label>
+                <input type="text" id="floor" name="floor" placeholder="2 / Последен">
+            </div>
+
+            <!-- Specific fields for HOUSE -->
+            <div class="form-group house-specific">
+                <label for="yard_area"><i class="fas fa-tree"></i> Площ на двор (кв.м):</label>
+                <input type="number" id="yard_area" name="yard_area" placeholder="100">
+            </div>
+            <div class="form-group house-specific">
+                <label for="number_of_floors"><i class="fas fa-hotel"></i> Брой етажи:</label>
+                <input type="number" id="number_of_floors" name="number_of_floors" placeholder="2">
+            </div>
+            <div class="form-group house-specific">
+                <label for="heating_system"><i class="fas fa-fire"></i> Отопление:</label>
+                <input type="text" id="heating_system" name="heating_system" placeholder="Локално / Газ / Електричество">
+            </div>
+            <div class="form-group house-specific">
+                <label for="pool"><i class="fas fa-swimming-pool"></i> Басейн:</label>
+                <input type="text" id="pool" name="pool" placeholder="Да / Не">
+            </div>
+            <div class="form-group house-specific">
+                <label for="garden"><i class="fas fa-seedling"></i> Градина:</label>
+                <input type="text" id="garden" name="garden" placeholder="Да / Не">
+            </div>
+
+            <!-- Specific fields for PLOT -->
+            <div class="form-group plot-specific">
+                <label for="zoning"><i class="fas fa-chart-area"></i> Зониране/Предназначение:</label>
+                <input type="text" id="zoning" name="zoning" placeholder="За жилищно строителство / Промишлено">
+            </div>
+            <div class="form-group plot-specific">
+                <label for="utilities"><i class="fas fa-faucet"></i> Комуникации:</label>
+                <input type="text" id="utilities" name="utilities" placeholder="Ток, Вода, Канал, Газ">
+            </div>
+            <div class="form-group plot-specific">
+                <label for="access_road"><i class="fas fa-road"></i> Достъп до път:</label>
+                <input type="text" id="access_road" name="access_road" placeholder="Асфалт / Макaдам">
+            </div>
+
+            <!-- Specific fields for SHOP/COMMERCIAL PROPERTY -->
+            <div class="form-group shop-specific">
+                <label for="commercial_type"><i class="fas fa-store"></i> Тип обект:</label>
+                <input type="text" id="commercial_type" name="commercial_type" placeholder="Магазин / Офис / Ресторант">
+            </div>
+            <div class="form-group shop-specific">
+                <label for="foot_traffic"><i class="fas fa-walking"></i> Поток от хора:</label>
+                <input type="text" id="foot_traffic" name="foot_traffic" placeholder="Висок / Среден / Нисък">
+            </div>
+            <div class="form-group shop-specific">
+                <label for="current_business"><i class="fas fa-briefcase"></i> Настоящ бизнес:</label>
+                <input type="text" id="current_business" name="current_business" placeholder="Аптека / Фризьорски салон / Няма">
+            </div>
+            <div class="form-group shop-specific">
+                <label for="facilities"><i class="fas fa-toilet"></i> Удобства в обекта:</label>
+                <input type="text" id="facilities" name="facilities" placeholder="Баня, Склад, Офис зона">
+            </div>
+
+            <!-- Specific fields for BUILDING -->
+            <div class="form-group building-specific">
+                <label for="total_built_up_area"><i class="fas fa-building"></i> Обща РЗП (кв.м):</label>
+                <input type="number" id="total_built_up_area" name="total_built_up_area" placeholder="500">
+            </div>
+            <div class="form-group building-specific">
+                <label for="number_of_units"><i class="fas fa-boxes"></i> Брой обекти/единици:</label>
+                <input type="number" id="number_of_units" name="number_of_units" placeholder="5 апартамента / 3 офиса">
+            </div>
+            <div class="form-group building-specific">
+                <label for="occupancy"><i class="fas fa-user-check"></i> Заетост (%):</label>
+                <input type="text" id="occupancy" name="occupancy" placeholder="100% / 50% / Свободна">
+            </div>
+            <div class="form-group building-specific">
+                <label for="income_potential"><i class="fas fa-money-bill-wave"></i> Потенциал за доход:</label>
+                <input type="text" id="income_potential" name="income_potential" placeholder="Висок / Среден / Нисък">
+            </div>
+            
+            <!-- Image Upload Field (always visible) -->
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label for="images"><i class="fas fa-images"></i> Качи снимки на имота:</label>
                 <input type="file" id="images" name="images" accept="image/*" multiple>
@@ -230,52 +339,101 @@
         <i class="fas fa-spinner fa-spin"></i> Генериране на обява... Моля, изчакайте.
     </div>
 
-    <div id="result-container" style="display:none;">
-        <h3><i class="fas fa-file-alt"></i> Генерирана обява:</h3>
-        <p id="generated-ad-text"></p>
-        <div class="image-preview-container" id="image-preview-container"></div>
-        <button id="copyAdButton" style="display:none; margin-top:1rem;"><i class="fas fa-copy"></i> Копирай обявата</button>
+    <!-- Results Section -->
+    <div id="results-sections" style="display:none;">
+        <!-- Short Ad Result -->
+        <div class="result-section" id="short-ad-section">
+            <h3><i class="fas fa-file-alt"></i> Кратка Обява:</h3>
+            <p id="generated-short-ad-text" class="generated-ad-text"></p>
+            <button class="copy-button" onclick="copyToClipboard('generated-short-ad-text')"><i class="fas fa-copy"></i> Копирай кратка обява</button>
+        </div>
+
+        <!-- Long Ad Result -->
+        <div class="result-section" id="long-ad-section" style="margin-top:2rem;">
+            <h3><i class="fas fa-file-alt"></i> Дълга Обява:</h3>
+            <p id="generated-long-ad-text" class="generated-ad-text"></p>
+            <button class="copy-button" onclick="copyToClipboard('generated-long-ad-text')"><i class="fas fa-copy"></i> Копирай дълга обява</button>
+        </div>
+        
         <p class="error-message" id="ad-error-message" style="display:none;"></p>
+        <div class="image-preview-container" id="image-preview-container"></div>
     </div>
 
     <script>
+        const propertyTypeSelector = document.getElementById('property_type');
+        const specificFields = {
+            'Апартамент': ['floor'],
+            'Къща': ['floor', 'yard_area', 'number_of_floors', 'heating_system', 'pool', 'garden'],
+            'Парцел': ['zoning', 'utilities', 'access_road'],
+            'Магазин/Обект': ['commercial_type', 'foot_traffic', 'current_business', 'facilities'],
+            'Сграда': ['total_built_up_area', 'number_of_units', 'occupancy', 'income_potential']
+        };
+
+        // Function to show/hide fields based on property type
+        function toggleSpecificFields() {
+            // Hide all specific fields first
+            document.querySelectorAll('.apartment, .house-specific, .plot-specific, .shop-specific, .building-specific').forEach(el => {
+                el.style.display = 'none';
+                // Clear their values when hidden
+                el.querySelectorAll('input, select, textarea').forEach(input => input.value = '');
+            });
+
+            // Show relevant fields
+            const selectedType = propertyTypeSelector.value;
+            if (selectedType) {
+                // Common fields for apartment/house (like floor)
+                if (selectedType === 'Апартамент' || selectedType === 'Къща') {
+                    document.querySelectorAll('.apartment').forEach(el => el.style.display = 'block');
+                }
+                if (specificFields[selectedType]) {
+                    specificFields[selectedType].forEach(fieldId => {
+                        const fieldElement = document.getElementById(fieldId);
+                        if (fieldElement && fieldElement.closest('.form-group')) {
+                            fieldElement.closest('.form-group').style.display = 'block';
+                        }
+                    });
+                }
+            }
+        }
+
+        // Initial call on load
+        toggleSpecificFields();
+        // Add event listener for changes in property type
+        propertyTypeSelector.addEventListener('change', toggleSpecificFields);
+
+
         document.getElementById('adForm').addEventListener('submit', async function (e) {
-            e.preventDefault(); // Prevent default form submission
+            e.preventDefault(); 
 
             const form = document.getElementById('adForm');
-            const formData = new FormData(form); // Get form data including files
+            const formData = new FormData(form);
 
-            // Prepare data for JSON payload
             const jsonData = {};
             for (const [key, value] of formData.entries()) {
-                if (key !== 'images') { // Exclude images for now, will handle separately
+                if (key !== 'images') {
                     jsonData[key] = value;
                 }
             }
 
-            // Read images as base64
             const imageFiles = document.getElementById('images').files;
             const base64Images = [];
             const imagePreviewContainer = document.getElementById('image-preview-container');
-            imagePreviewContainer.innerHTML = ''; // Clear previous previews
+            imagePreviewContainer.innerHTML = ''; 
 
-            // Display loading and clear previous results
             document.getElementById('loading-indicator').style.display = 'block';
-            document.getElementById('result-container').style.display = 'none';
+            document.getElementById('results-sections').style.display = 'none';
             document.getElementById('ad-error-message').style.display = 'none';
-            document.getElementById('generated-ad-text').innerHTML = '';
-            document.getElementById('copyAdButton').style.display = 'none'; // Hide copy button
+            document.getElementById('generated-short-ad-text').innerHTML = '';
+            document.getElementById('generated-long-ad-text').innerHTML = '';
 
-
-            // Use a Promise.all to wait for all FileReader operations to complete
+            // Read images as base64 and display previews
             const readFilePromises = [];
             for (let i = 0; i < imageFiles.length; i++) {
                 const file = imageFiles[i];
                 const reader = new FileReader();
                 readFilePromises.push(new Promise((resolve) => {
                     reader.onload = (e) => {
-                        base64Images.push(e.target.result); // Add base64 string
-                        // Display preview (only if needed, backend will not return these now)
+                        base64Images.push(e.target.result);
                         const img = document.createElement('img');
                         img.src = e.target.result;
                         img.alt = "Преглед на снимка";
@@ -285,20 +443,19 @@
                     reader.readAsDataURL(file);
                 }));
             }
+            await Promise.all(readFilePromises); 
 
-            await Promise.all(readFilePromises); // Wait for all images to be read
-
-            jsonData.images = base64Images; // Add base64 images to JSON data
+            jsonData.images = base64Images; 
 
             try {
                 const response = await fetch('/generate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }, // Set content type for JSON
-                    body: JSON.stringify(jsonData) // Send JSON payload
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(jsonData)
                 });
 
                 document.getElementById('loading-indicator').style.display = 'none';
-                document.getElementById('result-container').style.display = 'block';
+                document.getElementById('results-sections').style.display = 'block';
 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -317,32 +474,36 @@
                     throw new Error(result.error);
                 }
 
-                document.getElementById('generated-ad-text').innerHTML = result.generated_ad;
-                document.getElementById('copyAdButton').style.display = 'block'; // Show copy button
+                document.getElementById('generated-short-ad-text').innerHTML = result.short_ad;
+                document.getElementById('generated-long-ad-text').innerHTML = result.long_ad;
+                document.getElementById('short-ad-section').style.display = 'block';
+                document.getElementById('long-ad-section').style.display = 'block';
+
 
             } catch (error) {
                 document.getElementById('loading-indicator').style.display = 'none';
-                document.getElementById('result-container').style.display = 'block';
+                document.getElementById('results-sections').style.display = 'block'; /* Show container even on error */
+                document.getElementById('short-ad-section').style.display = 'none'; /* Hide ad sections */
+                document.getElementById('long-ad-section').style.display = 'none';
+                
                 const errorMessageElement = document.getElementById('ad-error-message');
                 errorMessageElement.innerText = `Възникна грешка: ${error.message}`;
                 errorMessageElement.style.display = 'block';
                 console.error('Error generating ad:', error);
-                document.getElementById('copyAdButton').style.display = 'none'; // Ensure copy button is hidden on error
             }
         });
 
         // Copy Ad Button functionality
-        document.getElementById('copyAdButton').addEventListener('click', async function() {
-            const adText = document.getElementById('generated-ad-text').innerText;
+        async function copyToClipboard(elementId) {
+            const adText = document.getElementById(elementId).innerText;
             try {
                 await navigator.clipboard.writeText(adText);
-                alert('Обявата е копирана в клипборда!'); // Temporary alert, can be custom modal
+                alert('Обявата е копирана в клипборда!');
             } catch (err) {
                 console.error('Failed to copy text: ', err);
-                // Fallback for older browsers or if navigator.clipboard not available/allowed
                 const textarea = document.createElement('textarea');
                 textarea.value = adText;
-                textarea.style.position = 'fixed'; // Avoid scrolling to bottom
+                textarea.style.position = 'fixed';
                 document.body.appendChild(textarea);
                 textarea.focus();
                 textarea.select();
@@ -354,7 +515,7 @@
                 }
                 document.body.removeChild(textarea);
             }
-        });
+        }
     </script>
 </body>
 </html>
