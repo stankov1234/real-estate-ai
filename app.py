@@ -2,7 +2,7 @@
 import os
 import json
 import base64
-from io import BytesIO # To handle image data in memory
+from io import BytesIO 
 
 from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 import openai
@@ -161,6 +161,7 @@ def generate_ad():
 1.  **Заглавие (СТРОГО ТОЗИ ФОРМАТ):** "💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]"
 2.  **Основен текст (ПОДРОБЕН - 10-15+ реда, без измислици):**
     * Емоционален встъпителен абзац, представящ най-големите ползи.
+    * **Ключови Характеристики (Резюме - кратък списък/редове):** Площ, Цена, Локация, Обзавеждане, и други основни, представени стегнато с емотикони. (Пример: "📐 Площ: {form_data['area']} кв.м | 💰 Цена: {form_data['price']} € | 📍 Локация: {form_data['location']} | 🛋️ Обзавеждане: {form_data['furnishing']}")
     * Подробно описание на {form_data['property_type']}, неговото разпределение, състояние, характеристики и предимства, извлечени от снимките и данните.
     * Информация за локацията и предимствата на квартала/района, специфични за {form_data['property_type']}.
     * Раздел "Защо с 360ESTATE?" с акцент върху професионална подкрепа, сигурност и улеснение.
@@ -182,7 +183,7 @@ def generate_ad():
             model="gpt-4o", # Using GPT-4o for multimodal capabilities
             messages=[{"role": "user", "content": messages_content}],
             temperature=0.8,
-            max_tokens=2000 # Increased max_tokens to accommodate two ad versions
+            max_tokens=2500 # Increased max_tokens to ensure enough space for detailed output
         )
         full_generated_text = response.choices[0].message.content.strip()
         print(f"DEBUG: OpenAI Response received. Full text length: {len(full_generated_text)}")
@@ -192,29 +193,39 @@ def generate_ad():
         long_ad_start_marker = "---ДЪЛГА ОБЯВА START---"
         end_ad_marker = "---КРАЙ ОБЯВА---"
 
-        short_ad = "Неуспешно генериране на кратка обява."
-        long_ad = "Неуспешно генериране на дълга обява."
+        short_ad = "Неуспешно генериране на кратка обява. Моля, проверете логовете."
+        long_ad = "Неуспешно генериране на дълга обява. Моля, проверете логовете."
 
         if short_ad_start_marker in full_generated_text and long_ad_start_marker in full_generated_text:
-            short_start_index = full_generated_text.find(short_ad_start_marker) + len(short_ad_start_marker)
-            long_start_index = full_generated_text.find(long_ad_start_marker) + len(long_ad_start_marker)
+            # Extract content between markers
+            # Short ad part: from its marker to the long ad marker
+            start_short = full_generated_text.find(short_ad_start_marker) + len(short_ad_start_marker)
+            end_short = full_generated_text.find(long_ad_start_marker, start_short)
+            if end_short != -1:
+                short_ad_content = full_generated_text[start_short:end_short].strip()
+                if end_ad_marker in short_ad_content: # If end marker is inside short ad block
+                    short_ad = short_ad_content[:short_ad_content.find(end_ad_marker)].strip()
+                else:
+                    short_ad = short_ad_content
+            else: # Fallback if long ad marker not found after short ad marker
+                short_ad = full_generated_text[start_short:].strip()
+                if end_ad_marker in short_ad:
+                    short_ad = short_ad[:short_ad.find(end_ad_marker)].strip()
 
-            short_ad_temp = full_generated_text[short_start_index:long_start_index].strip()
-            long_ad_temp = full_generated_text[long_start_index:].strip()
 
-            if end_ad_marker in short_ad_temp:
-                short_ad = short_ad_temp[:short_ad_temp.find(end_ad_marker)].strip()
+            # Long ad part: from its marker to the final end marker
+            start_long = full_generated_text.find(long_ad_start_marker) + len(long_ad_start_marker)
+            long_ad_content = full_generated_text[start_long:].strip()
+            if end_ad_marker in long_ad_content:
+                long_ad = long_ad_content[:long_ad_content.find(end_ad_marker)].strip()
             else:
-                short_ad = short_ad_temp.strip() # If end marker missing, take until long version start
+                long_ad = long_ad_content
 
-            if end_ad_marker in long_ad_temp:
-                long_ad = long_ad_temp[:long_ad_temp.find(end_ad_marker)].strip()
-            else:
-                long_ad = long_ad_temp.strip() # If end marker missing, take till end of text
         else:
             # Fallback if markers are not found, return full text as long ad and a generic short ad
+            print("DEBUG: Markers not found in AI response. Returning full text as long ad.")
             long_ad = full_generated_text
-            short_ad = "Кратка версия не може да бъде извлечена. Моля, вижте дългата обява."
+            short_ad = "Кратка версия не може да бъде извлечена. Моля, вижте дългата обява или проверете логовете за AI отговор."
 
 
     except openai.APIError as e:
@@ -252,6 +263,7 @@ def generate_pdf():
     styles.add(ParagraphStyle(name='AdTitle', parent=styles['h1'], fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
     styles.add(ParagraphStyle(name='AdBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
     styles.add(ParagraphStyle(name='ImageCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, spaceAfter=6))
+    styles.add(ParagraphStyle(name='BulletPoint', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=2, leftIndent=36)) # For list items
 
     story = []
 
@@ -259,11 +271,58 @@ def generate_pdf():
     story.append(Spacer(1, 0.2 * inch))
 
     # Add ad text
-    for line in ad_text.split('\n'):
-        if line.strip(): # Add non-empty lines as paragraphs
-            story.append(Paragraph(line.replace('💥', '<b>💥</b>').replace('✨', '<b>✨</b>').replace('🔓', '<b>🔓</b>').replace('📌', '<b>📌</b>').replace('📞', '<b>📞</b>'), styles['AdBody']))
-        else: # For empty lines, add a small spacer
+    # Try to parse and format the ad text to correctly handle paragraphs, lists, and bold text.
+    # This is a simplified approach, a more robust HTML parser would be needed for complex cases.
+    lines = ad_text.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line: # Empty line
             story.append(Spacer(1, 0.1 * inch))
+            continue
+
+        # Basic formatting for bolding and emojis. ReportLab uses its own markup.
+        # This is an attempt to map some common formatting.
+        formatted_line = line.replace('**', '<b>').replace('__', '<b>').replace('*', '<b>') # Basic bold
+        formatted_line = formatted_line.replace('💥', '<font face="Helvetica">💥</font>') # Emojis might need specific font
+        formatted_line = formatted_line.replace('✨', '<font face="Helvetica">✨</font>')
+        formatted_line = formatted_line.replace('🔓', '<font face="Helvetica">🔓</font>')
+        formatted_line = formatted_line.replace('📌', '<font face="Helvetica">📌</font>')
+        formatted_line = formatted_line.replace('📞', '<font face="Helvetica">📞</font>')
+        formatted_line = formatted_line.replace('✅', '<font face="Helvetica">✅</font>')
+        formatted_line = formatted_line.replace('🏡', '<font face="Helvetica">🏡</font>')
+        formatted_line = formatted_line.replace('📐', '<font face="Helvetica">📐</font>')
+        formatted_line = formatted_line.replace('💰', '<font face="Helvetica">💰</font>')
+        formatted_line = formatted_line.replace('📍', '<font face="Helvetica">📍</font>')
+        formatted_line = formatted_line.replace('🛋️', '<font face="Helvetica">🛋️</font>')
+        formatted_line = formatted_line.replace('🌳', '<font face="Helvetica">🌳</font>')
+        formatted_line = formatted_line.replace('🏊', '<font face="Helvetica">🏊</font>')
+        formatted_line = formatted_line.replace('🚗', '<font face="Helvetica">🚗</font>')
+        formatted_line = formatted_line.replace('🔥', '<font face="Helvetica">🔥</font>')
+        formatted_line = formatted_line.replace('🏞️', '<font face="Helvetica">🏞️</font>')
+        formatted_line = formatted_line.replace('💧', '<font face="Helvetica">💧</font>')
+        formatted_line = formatted_line.replace('⚡', '<font face="Helvetica">⚡</font>')
+        formatted_line = formatted_line.replace('🛣️', '<font face="Helvetica">🛣️</font>')
+        formatted_line = formatted_line.replace('🛍️', '<font face="Helvetica">🛍️</font>')
+        formatted_line = formatted_line.replace('📈', '<font face="Helvetica">📈</font>')
+        formatted_line = formatted_line.replace('人🚶‍♂️', '<font face="Helvetica">🚶</font>') # Simpler representation
+        formatted_line = formatted_line.replace('🏗️', '<font face="Helvetica">🏗️</font>')
+        formatted_line = formatted_line.replace('🏘️', '<font face="Helvetica">🏘️</font>')
+        formatted_line = formatted_line.replace('🎯', '<font face="Helvetica">🎯</font>')
+        formatted_line = formatted_line.replace('💡', '<font face="Helvetica">💡</font>')
+        formatted_line = formatted_line.replace('🛗', '<font face="Helvetica">🛗</font>')
+        formatted_line = formatted_line.replace('🛌', '<font face="Helvetica">🛌</font>')
+        formatted_line = formatted_line.replace('🛀', '<font face="Helvetica">🛀</font>')
+        formatted_line = formatted_line.replace('🍽️', '<font face="Helvetica">🍽️</font>')
+        formatted_line = formatted_line.replace('🌿', '<font face="Helvetica">🌿</font>')
+
+
+        # Handle list items
+        if formatted_line.startswith('✅ '):
+            story.append(Paragraph(f'• {formatted_line[2:]}', styles['BulletPoint']))
+        elif formatted_line.startswith('- '):
+             story.append(Paragraph(f'• {formatted_line[2:]}', styles['BulletPoint']))
+        else:
+            story.append(Paragraph(formatted_line, styles['AdBody']))
 
     story.append(Spacer(1, 0.4 * inch))
 
