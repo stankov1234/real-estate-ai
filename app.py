@@ -9,6 +9,9 @@ from flask import Flask, request, jsonify, render_template, send_from_directory
 import openai
 from werkzeug.utils import secure_filename
 
+# Import the browsing tool
+import browsing # Assuming this tool is available in the environment
+
 # Initialize the Flask application
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -51,7 +54,7 @@ def generate_ad():
     
     # Extract text fields
     form_data = {
-        'property_type': data.get('property_type', 'Апартамент'), # New field
+        'property_type': data.get('property_type', 'Апартамент'), 
         'location': data.get('location', 'неуточнена'),
         'price': data.get('price', 'неуточнена'),
         'area': data.get('area', 'неуточнена'),
@@ -65,8 +68,8 @@ def generate_ad():
         'exclusive': data.get('exclusive', 'неуточнена'),
         'financing': data.get('financing', 'неуточнено'),
         'unique_features': data.get('unique_features', 'неуточнени'),
-        'broker_name': data.get('broker_name', 'брокер'), # New field
-        'broker_phone': data.get('broker_phone', 'неуточнен телефон'), # New field
+        'broker_name': data.get('broker_name', 'брокер'), 
+        'broker_phone': data.get('broker_phone', 'неуточнен телефон'), 
         # New specific fields for different property types
         'yard_area': data.get('yard_area', ''),
         'number_of_floors': data.get('number_of_floors', ''),
@@ -84,6 +87,8 @@ def generate_ad():
         'number_of_units': data.get('number_of_units', ''),
         'occupancy': data.get('occupancy', ''),
         'income_potential': data.get('income_potential', ''),
+        # New field for existing ad URL
+        'existing_ad_url': data.get('existing_ad_url', ''),
     }
 
     # Extract base64 image data (still used by AI for vision)
@@ -92,6 +97,20 @@ def generate_ad():
     generated_short_ad = "Възникна грешка при генерирането на кратката обява."
     generated_long_ad = "Възникна грешка при генерирането на дългата обява."
     error_message = None
+
+    # Browse existing ad URL if provided
+    browsed_content = ""
+    if form_data['existing_ad_url']:
+        print(f"DEBUG: Browsing URL: {form_data['existing_ad_url']}")
+        try:
+            # Use the browsing tool to fetch content
+            browsed_content = browsing.browse(url=form_data['existing_ad_url'])
+            print(f"DEBUG: Browsed content length: {len(browsed_content)} chars")
+            if len(browsed_content) > 5000: # Limit content length to avoid exceeding token limits
+                browsed_content = browsed_content[:5000] + "\n... (съдържанието е съкратено поради дължина)"
+        except Exception as e:
+            print(f"DEBUG ERROR: Failed to browse URL: {e}")
+            browsed_content = f"Грешка при зареждане на обява от линк: {e}"
 
     try:
         if client is None:
@@ -105,7 +124,7 @@ def generate_ad():
         base_text_prompt = f"""
 Ти си експерт по имотни обяви и маркетинг за недвижими и имоти. Твоята задача е да създадеш ДВЕ ВЕРСИИ на обява за продажба на имот, съобразена с Facebook Marketplace. Всяка обява трябва да следва стриктно дефинираните секции и техния ред.
 
-**СТРОГО СЕ ПРИДЪРЖАЙ САМО КЪМ ФАКТИЧЕСКИ ДАННИ, ПРЕДОСТАВЕНИ В ТЕКСТА ИЛИ ВИЗУАЛНО ОТКРИТИ В ИЗОБРАЖЕНИЯТА. НЕ ИЗМИСЛЯЙ НИКАКВИ ДОПЪЛНИТЕЛНИ ХАРАКТЕРИСТИКИ ИЛИ ПРЕДИМСТВА.**
+**СТРОГО СЕ ПРИДЪРЖАЙ САМО КЪМ ФАКТИЧЕСКИ ДАННИ, ПРЕДОСТАВЕНИ В ТЕКСТА (включително от "Допълнителна информация от съществуваща обява") ИЛИ ВИЗУАЛНО ОТКРИТИ В ИЗОБРАЖЕНИЯТА. НЕ ИЗМИСЛЯЙ НИКАКВИ ДОПЪЛНИТЕЛНИ ХАРАКТЕРИСТИКИ ИЛИ ПРЕДИМСТВА.**
 **НЕ ВКЛЮЧВАЙ НОМЕРИРАНИ СПИСЪЦИ (1., 2., 3. и т.н.) ИЛИ ВЪТРЕШНИ МАРКЕРИ ЗА СЕКЦИИ В ГЕНЕРИРАНИЯ ТЕКСТ НА ОБЯВИТЕ. Генерирай директно съдържанието.**
 
 Анализирай внимателно предоставените изображения за ключови визуални предимства (напр. луксозен интериор, панорамна гледка, модерни уреди, простор, уют, състояние на стаите, обзавеждане, състояние на двор/градина, комуникации за парцел, лице на улица за магазин) и ги интегрирай в обявата.
@@ -141,10 +160,12 @@ def generate_ad():
 {f"📈 Заетост: {form_data['occupancy']}" if form_data['occupancy'] else ""}
 {f"💰 Потенциал за доход: {form_data['income_potential']}" if form_data['income_potential'] else ""}
 
+{f"Допълнителна информация от съществуваща обява (МОЛЯ, ИЗПОЛЗВАЙ САМО ФАКТИ ОТ ТАЗИ СЕКЦИЯ, НЕ ИЗМИСЛЯЙ): {browsed_content}" if browsed_content else ""}
+
 ---КРАТКА ОБЯВА START---
 
 Заглавие: 
-💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]
+💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните, снимките и/или "Допълнителна информация от съществуваща обява", релевантни за {form_data['property_type']}]
 Откриващ текст: 
 🏡 [Кратко и ясно, едно вдъхновяващо изречение, което подчертава готовност за нанасяне или финансова достъпност. Веднага след това основните параметри на имота: {form_data['area']} кв.м | САМО {form_data['price']} € | {form_data['location']}]
 Разсрочено плащане: 
@@ -156,7 +177,7 @@ def generate_ad():
 ---ДЪЛГА ОБЯВА START---
 
 Заглавие: 
-💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]
+💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните, снимките и/или "Допълнителна информация от съществуваща обява", релевантни за {form_data['property_type']}]
 Откриващ текст: 
 🏡 [Кратко и ясно, едно вдъхновяващо изречение, което подчертава готовност за нанасяне или финансова достъпност, преплетено с основните характеристики: цена {form_data['price']} €, местоположение {form_data['location']} и вид имот {form_data['property_type']}].
 Разсрочено плащане: 
@@ -234,11 +255,6 @@ def generate_ad():
         'images_for_pdf': image_data_base64 # Pass base64 images to frontend for PDF generation
     })
 
-# The /generate_pdf route and all its dependencies are removed.
-# @app.route('/generate_pdf', methods=['POST'])
-# def generate_pdf():
-#    ... (removed code) ...
-
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     return '.' in filename and \
@@ -255,4 +271,3 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     app.run(debug=True)
-
