@@ -2,8 +2,8 @@
 import os
 import json
 import base64
-from io import BytesIO 
-import re 
+from io import BytesIO
+import re
 
 from flask import Flask, request, jsonify, render_template, send_from_directory
 import openai
@@ -35,18 +35,36 @@ APP_PASSWORD = "360estate"
 
 @app.route('/')
 def index():
+    """
+    Renders the login page when the root URL is accessed.
+    This is the first page users will see to enter the password.
+    """
     return render_template('login.html')
 
 @app.route('/login', methods=['POST'])
 def login():
+    """
+    Handles the login form submission.
+    Checks if the entered password matches the APP_PASSWORD.
+    """
     password = request.form.get("password")
     if password == APP_PASSWORD:
+        # If password is correct, render the main form for generating ads
         return render_template('form.html')
     else:
+        # If password is incorrect, re-render the login page with an error message
         return render_template('login.html', error=True)
 
 @app.route('/generate', methods=['POST'])
 def generate_ad():
+    """
+    Handles the ad generation form submission.
+    - Extracts data from the form, including an optional existing ad URL.
+    - If a URL is provided, it uses the browsing tool to fetch content.
+    - Constructs a detailed multimodal prompt for the AI based on form data, browsed content, and image data.
+    - Calls OpenAI API (GPT-4o) to generate two versions of the ad text (short and long).
+    - Returns the generated ad texts as a JSON response.
+    """
     print("DEBUG: generate_ad route hit!")
 
     # Parse JSON data from the request
@@ -87,11 +105,11 @@ def generate_ad():
         'number_of_units': data.get('number_of_units', ''),
         'occupancy': data.get('occupancy', ''),
         'income_potential': data.get('income_potential', ''),
-        # New field for existing ad URL
+        # Field for existing ad URL
         'existing_ad_url': data.get('existing_ad_url', ''),
     }
 
-    # Extract base64 image data (still used by AI for vision)
+    # Extract base64 image data (used by AI for vision)
     image_data_base64 = data.get('images', [])
 
     generated_short_ad = "Възникна грешка при генерирането на кратката обява."
@@ -104,10 +122,11 @@ def generate_ad():
         print(f"DEBUG: Browsing URL: {form_data['existing_ad_url']}")
         try:
             # Use the browsing tool to fetch content
+            # Increased limit to allow more detailed information from the browsed page
             browsed_content = browsing.browse(url=form_data['existing_ad_url'])
             print(f"DEBUG: Browsed content length: {len(browsed_content)} chars")
-            if len(browsed_content) > 5000: # Limit content length to avoid exceeding token limits
-                browsed_content = browsed_content[:5000] + "\n... (съдържанието е съкратено поради дължина)"
+            if len(browsed_content) > 10000: # Limit content length to avoid exceeding token limits
+                browsed_content = browsed_content[:10000] + "\n... (съдържанието е съкратено поради дължина)"
         except Exception as e:
             print(f"DEBUG ERROR: Failed to browse URL: {e}")
             browsed_content = f"Грешка при зареждане на обява от линк: {e}"
@@ -124,12 +143,15 @@ def generate_ad():
         base_text_prompt = f"""
 Ти си експерт по имотни обяви и маркетинг за недвижими и имоти. Твоята задача е да създадеш ДВЕ ВЕРСИИ на обява за продажба на имот, съобразена с Facebook Marketplace. Всяка обява трябва да следва стриктно дефинираните секции и техния ред.
 
-**СТРОГО СЕ ПРИДЪРЖАЙ САМО КЪМ ФАКТИЧЕСКИ ДАННИ, ПРЕДОСТАВЕНИ В ТЕКСТА (включително от "Допълнителна информация от съществуваща обява") ИЛИ ВИЗУАЛНО ОТКРИТИ В ИЗОБРАЖЕНИЯТА. НЕ ИЗМИСЛЯЙ НИКАКВИ ДОПЪЛНИТЕЛНИ ХАРАКТЕРИСТИКИ ИЛИ ПРЕДИМСТВА.**
-**НЕ ВКЛЮЧВАЙ НОМЕРИРАНИ СПИСЪЦИ (1., 2., 3. и т.н.) ИЛИ ВЪТРЕШНИ МАРКЕРИ ЗА СЕКЦИИ В ГЕНЕРИРАНИЯ ТЕКСТ НА ОБЯВИТЕ. Генерирай директно съдържанието.**
+**Ако е предоставен линк към съществуваща обява ("Допълнителна информация от съществуваща обява"), моля, ИЗВЛЕЧИ ВСИЧКИ НЕОБХОДИМИ ДАННИ И ПОДРОБНОСТИ ЗА ИМОТА (Тип, Цена, Площ, Локация, Обзавеждане, Етаж, Година на строеж, Удобства, Характеристики, Предимства) ОТ ТЕКСТА НА ТАЗИ ОБЯВА. ТАЗИ ИНФОРМАЦИЯ Е С ВИСОК ПРИОРИТЕТ И ТРЯБВА ДА БЪДЕ ОСНОВНА ЗА ГЕНЕРИРАНЕТО НА ОБЯВАТА.**
+**Използвай въведените данни във формата от брокера (под "Данни, въведени от брокера") като ДОПЪЛНИТЕЛНА ИНФОРМАЦИЯ или ПОТВЪРЖДЕНИЕ, като ги предпочиташ само ако информацията от линка липсва или е неясна за дадено поле. УВЕРИ СЕ, ЧЕ ПОЛЗВАШ И ДВАТА ИЗТОЧНИКА НА ИНФОРМАЦИЯ.**
+
+**СТРОГО СЕ ПРИДЪРЖАЙ САМО КЪМ ФАКТИЧЕСКИ ДАННИ, ПРЕДОСТАВЕНИ В ТЕКСТА ИЛИ ВИЗУАЛНО ОТКРИТИ В ИЗОБРАЖЕНИЯТА. НЕ ИЗМИСЛЯЙ НИКАКВИ ДОПЪЛНИТЕЛНИ ХАРАКТЕРИСТИКИ ИЛИ ПРЕДИМСТВА.**
+**НЕ ВКЛЮЧВАЙ НОМЕРИРАНИ СПИСЪЦИ (1., 2., 3. и т.n.) ИЛИ ВЪТРЕШНИ МАРКЕРИ ЗА СЕКЦИИ В ГЕНЕРИРАНИЯ ТЕКСТ НА ОБЯВИТЕ. Генерирай директно съдържанието.**
 
 Анализирай внимателно предоставените изображения за ключови визуални предимства (напр. луксозен интериор, панорамна гледка, модерни уреди, простор, уют, състояние на стаите, обзавеждане, състояние на двор/градина, комуникации за парцел, лице на улица за магазин) и ги интегрирай в обявата.
 
-Данни за имота (Тип: {form_data['property_type']}):
+Данни, въведени от брокера (използвай като корекция/допълнение към линка):
 📌 Локация: {form_data['location']}
 💰 Цена: {form_data['price']} €
 📐 Площ: {form_data['area']} кв.м
@@ -160,7 +182,7 @@ def generate_ad():
 {f"📈 Заетост: {form_data['occupancy']}" if form_data['occupancy'] else ""}
 {f"💰 Потенциал за доход: {form_data['income_potential']}" if form_data['income_potential'] else ""}
 
-{f"Допълнителна информация от съществуваща обява (МОЛЯ, ИЗПОЛЗВАЙ САМО ФАКТИ ОТ ТАЗИ СЕКЦИЯ, НЕ ИЗМИСЛЯЙ): {browsed_content}" if browsed_content else ""}
+{f"Допълнителна информация от съществуваща обява (МОЛЯ, ИЗВЛЕЧИ ВСИЧКИ НЕОБХОДИМИ ДАННИ ЗА ИМОТА ОТ ТОЗИ ТЕКСТ): {browsed_content}" if browsed_content else ""}
 
 ---КРАТКА ОБЯВА START---
 
@@ -210,7 +232,16 @@ def generate_ad():
             temperature=0.8,
             max_tokens=2500 # Increased max_tokens to ensure enough space for detailed output
         )
-        full_generated_text = response.choices[0].message.content.strip()
+        full_generated_text = response.choices[0].message.strip() # Removed .content.
+        
+        # Check if message is a ChatCompletionMessage and has 'content' attribute
+        if hasattr(response.choices[0].message, 'content') and response.choices[0].message.content is not None:
+            full_generated_text = response.choices[0].message.content.strip()
+        else:
+            print("DEBUG ERROR: OpenAI response message content is missing or None.")
+            full_generated_text = "Грешка: AI не върна съдържание."
+
+
         print(f"DEBUG: OpenAI Response received. Full text length: {len(full_generated_text)}")
 
         # Parse the full generated text into short and long versions using updated markers
