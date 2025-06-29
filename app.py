@@ -68,9 +68,14 @@ def generate_ad():
         if image and allowed_file(image.filename):
             filename = secure_filename(image.filename)
             path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            image.save(path)
-            # Store the URL relative to the static folder for display
-            image_urls.append(f'/static/uploads/{filename}')
+            try:
+                image.save(path)
+                # Store the URL relative to the static folder for display
+                image_urls.append(f'/static/uploads/{filename}')
+            except Exception as e:
+                print(f"Error saving image {filename}: {e}")
+                # Optionally, you might want to return an error or skip this image
+                pass
 
     # Construct the detailed prompt for the AI based on the provided data
     # This prompt incorporates all the refined phrases and structures we discussed
@@ -160,4 +165,5 @@ def allowed_file(filename):
 # but it's good practice to keep it for local testing.
 if __name__ == '__main__':
     app.run(debug=True) # debug=True allows for automatic reloading and error messages
+
 
