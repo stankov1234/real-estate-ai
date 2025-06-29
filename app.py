@@ -2,11 +2,18 @@
 import os
 import json
 import base64
-from io import BytesIO # Not strictly used for saving, but for understanding image data flow
+from io import BytesIO # To handle image data in memory
 
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 import openai
 from werkzeug.utils import secure_filename
+
+# Import ReportLab for PDF generation
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 # Initialize the Flask application
 app = Flask(__name__, template_folder='templates', static_folder='static')
@@ -64,8 +71,8 @@ def generate_ad():
         'exclusive': data.get('exclusive', 'неуточнена'),
         'financing': data.get('financing', 'неуточнено'),
         'unique_features': data.get('unique_features', 'неуточнени'),
-        'broker_name': data.get('broker_name', 'брокер'),
-        'broker_phone': data.get('broker_phone', 'неуточнен телефон'),
+        'broker_name': data.get('broker_name', 'брокер'), # New field
+        'broker_phone': data.get('broker_phone', 'неуточнен телефон'), # New field
         # New specific fields for different property types
         'yard_area': data.get('yard_area', ''),
         'number_of_floors': data.get('number_of_floors', ''),
@@ -227,8 +234,88 @@ def generate_ad():
     return jsonify({
         'short_ad': short_ad,
         'long_ad': long_ad,
-        'image_urls': [] # Images are processed by AI, not saved/served by Flask for this flow
+        'images_for_pdf': image_data_base64 # Pass base64 images to frontend for PDF generation
     })
+
+@app.route('/generate_pdf', methods=['POST'])
+def generate_pdf():
+    print("DEBUG: generate_pdf route hit!")
+    data = request.json
+    ad_text = data.get('ad_text', 'Няма текст за обявата.')
+    images_b64 = data.get('images_for_pdf', [])
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    
+    # Custom style for title and body
+    styles.add(ParagraphStyle(name='AdTitle', parent=styles['h1'], fontSize=16, leading=18, alignment=TA_CENTER, spaceAfter=12))
+    styles.add(ParagraphStyle(name='AdBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6, alignment=TA_LEFT))
+    styles.add(ParagraphStyle(name='ImageCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, spaceAfter=6))
+
+    story = []
+
+    story.append(Paragraph("<b><font size=16>Генерирана Обява от 360ESTATE</font></b>", styles['AdTitle']))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Add ad text
+    for line in ad_text.split('\n'):
+        if line.strip(): # Add non-empty lines as paragraphs
+            story.append(Paragraph(line.replace('💥', '<b>💥</b>').replace('✨', '<b>✨</b>').replace('🔓', '<b>🔓</b>').replace('📌', '<b>📌</b>').replace('📞', '<b>📞</b>'), styles['AdBody']))
+        else: # For empty lines, add a small spacer
+            story.append(Spacer(1, 0.1 * inch))
+
+    story.append(Spacer(1, 0.4 * inch))
+
+    # Add images
+    if images_b64:
+        story.append(Paragraph("<b><font size=12>Прикачени изображения:</font></b>", styles['h2']))
+        story.append(Spacer(1, 0.2 * inch))
+        for i, img_b64 in enumerate(images_b64):
+            try:
+                # Remove data:image/png;base64, or similar prefix
+                header, base64_string = img_b64.split(',', 1)
+                img_data = base64.b64decode(base64_string)
+                img = Image(BytesIO(img_data))
+                
+                # Scale image to fit page width, maintaining aspect ratio
+                # Assuming A4 width (595 points) and some margins (e.g., 50 points per side)
+                # Image width should be max 495 points (A4 width - 2*50 margins)
+                img_width = img.drawWidth
+                img_height = img.drawHeight
+                
+                max_img_width = A4[0] - 2 * inch # A4 width minus 2 inches margin
+                
+                if img_width > max_img_width:
+                    scale_factor = max_img_width / img_width
+                    img_width = max_img_width
+                    img_height = img_height * scale_factor
+                
+                # If after scaling width, height is too big, scale based on height (e.g., max 4 inches)
+                max_img_height = 4 * inch
+                if img_height > max_img_height:
+                    scale_factor = max_img_height / img_height
+                    img_width = img_width * scale_factor
+                    img_height = max_img_height
+
+                img.drawWidth = img_width
+                img.drawHeight = img_height
+                
+                story.append(img)
+                story.append(Paragraph(f"<i>Снимка {i+1}</i>", styles['ImageCaption']))
+                story.append(Spacer(1, 0.1 * inch))
+            except Exception as e:
+                print(f"DEBUG ERROR: Failed to embed image {i+1} in PDF: {e}")
+                story.append(Paragraph(f"<i>Неуспешно зареждане на снимка {i+1}</i>", styles['ImageCaption']))
+                story.append(Spacer(1, 0.1 * inch))
+
+    try:
+        doc.build(story)
+        buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name='Obyava_za_Imot.pdf', mimetype='application/pdf')
+    except Exception as e:
+        print(f"DEBUG ERROR: Failed to build PDF: {e}")
+        return jsonify({"error": f"Грешка при генериране на PDF: {str(e)}"}), 500
 
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -246,4 +333,3 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     app.run(debug=True)
-
