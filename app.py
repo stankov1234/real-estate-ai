@@ -19,7 +19,15 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Configure OpenAI API key from environment variables for security
 # Make sure to set OPENAI_API_KEY in your Render environment settings
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# New way to initialize OpenAI client for openai>=1.0.0
+# The API key is automatically picked up from OPENAI_API_KEY environment variable
+try:
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    print("DEBUG: OpenAI client initialized successfully.")
+except Exception as e:
+    print(f"DEBUG ERROR: Failed to initialize OpenAI client: {e}")
+    client = None # Set client to None if initialization fails
+
 
 # Define the application password for authentication
 # In a real-world scenario, consider more secure password management (e.g., hashing, database)
@@ -120,15 +128,14 @@ def generate_ad():
     error_message = None
 
     try:
-        # Check if OpenAI API key is available
-        if not openai.api_key:
-            print("DEBUG ERROR: OpenAI API key is NOT set.") # Debug print
-            raise ValueError("OpenAI API ключът не е настроен. Моля, задайте го в променливите на средата.")
+        # Check if OpenAI client is initialized
+        if client is None:
+            raise ValueError("OpenAI клиентът не е инициализиран. API ключът може да липсва или да е невалиден.")
 
-        print(f"DEBUG: OpenAI API key present: {bool(openai.api_key)}") # Debug print
+        print(f"DEBUG: OpenAI client is ready.") # Debug print
 
-        # Call OpenAI Chat Completion API
-        response = openai.ChatCompletion.create(
+        # Call OpenAI Chat Completion API using the new syntax (client.chat.completions.create)
+        response = client.chat.completions.create( # CORRECTED LINE
             model="gpt-4", # Using GPT-4 as requested
             messages=[
                 {"role": "system", "content": "Ти си експерт по имотни обяви и маркетинг за недвижими имоти."},
@@ -137,11 +144,11 @@ def generate_ad():
             temperature=0.8, # Controls creativity (0.8 is a good balance)
             max_tokens=1200 # Max length of the generated response
         )
-        generated_ad = response.choices[0].message['content'].strip()
+        generated_ad = response.choices[0].message.content.strip() # Access content correctly
         print(f"DEBUG: OpenAI Response received. Generated ad length: {len(generated_ad)}") # Debug print
 
     # Catch specific OpenAI API errors using the correct exception class for newer versions
-    except openai.APIError as e: # Corrected exception handling
+    except openai.APIError as e: # This should now correctly catch API errors
         error_message = f"AI грешка: Проблем с OpenAI API: {str(e)}. Моля, проверете API ключа и лимитите си."
         print(f"DEBUG ERROR: OpenAI API Error: {error_message}") # Log error for debugging
         return jsonify({"error": error_message}), 500
@@ -149,7 +156,7 @@ def generate_ad():
         error_message = f"Конфигурационна грешка: {str(e)}"
         print(f"DEBUG ERROR: ValueError: {error_message}") # Log error
         return jsonify({"error": error_message}), 500
-    except Exception as e:
+    except Exception as e: # Catch any other unexpected errors
         error_message = f"Неочаквана грешка: {str(e)}"
         print(f"DEBUG ERROR: Generic Exception in generate_ad: {error_message}") # Log any other unexpected errors
         return jsonify({"error": error_message}), 500
