@@ -108,7 +108,7 @@
             box-shadow: 0 10px 15px rgba(0, 0, 0, 0.25); /* shadow-xl */
             width: 100%;
             max-width: 800px;
-            margin-top: 2rem;
+            margin-bottom: 2rem;
             box-sizing: border-box;
         }
         .result-section h3 {
@@ -192,15 +192,15 @@
             <!-- Common Fields (always visible) -->
             <div class="form-group">
                 <label for="location"><i class="fas fa-map-marker-alt"></i> Локация:</label>
-                <input type="text" id="location" name="location" placeholder="Квартал, град" required>
+                <input type="text" id="location" name="location" placeholder="Квартал, град">
             </div>
             <div class="form-group">
                 <label for="price"><i class="fas fa-euro-sign"></i> Цена (€):</label>
-                <input type="number" id="price" name="price" placeholder="150000" required>
+                <input type="number" id="price" name="price" placeholder="150000">
             </div>
             <div class="form-group">
                 <label for="area"><i class="fas fa-ruler-combined"></i> Площ (кв.м):</label>
-                <input type="number" id="area" name="area" placeholder="90" required>
+                <input type="number" id="area" name="area" placeholder="90">
             </div>
             <div class="form-group">
                 <label for="year_built"><i class="fas fa-calendar-alt"></i> Година на строеж:</label>
@@ -249,8 +249,8 @@
             
             <!-- New field for existing ad URL -->
             <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="existing_ad_url"><i class="fas fa-link"></i> Линк към съществуваща обява (по избор):</label>
-                <input type="text" id="existing_ad_url" name="existing_ad_url" placeholder="https://example.com/property-ad">
+                <label for="existing_ad_url"><i class="fas fa-link"></i> Линк към съществуваща обява (приоритетна информация):</label>
+                <input type="text" id="existing_ad_url" name="existing_ad_url" placeholder="https://www.imot.bg/obiava-...">
             </div>
 
             <!-- Specific fields for APARTMENT / HOUSE -->
@@ -558,7 +558,7 @@
                 }
                 document.body.removeChild(textarea);
             }
-        }
+        });
     </script>
 </body>
 </html>
