@@ -250,11 +250,15 @@
                 document.getElementById('result-container').style.display = 'block';
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Неизвестна грешка при генерирането на обявата.');
+                    const errorData = await response.json(); // Try to parse error as JSON
+                    throw new Error(errorData.error || `Сървърна грешка: ${response.status} ${response.statusText}`);
                 }
 
                 const result = await response.json(); // Expect JSON response
+
+                if (result.error) {
+                    throw new Error(result.error);
+                }
 
                 document.getElementById('generated-ad-text').innerHTML = result.generated_ad;
 
