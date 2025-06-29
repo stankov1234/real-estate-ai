@@ -7,7 +7,6 @@
 <body>
   <h2>Генерирай обява за имот</h2>
   <form id="adform" enctype="multipart/form-data" method="POST">
-    <input name="title" placeholder="Заглавие" required /><br>
     <input name="location" placeholder="Локация" required /><br>
     <input name="price" placeholder="Цена (€)" required /><br>
     <input name="area" placeholder="Площ (кв.м)" required /><br>
@@ -37,17 +36,24 @@
       const form = document.getElementById('adform');
       const formData = new FormData(form);
 
-      const res = await fetch('/generate', {
-        method: 'POST',
-        body: formData
-      });
+      try {
+        const res = await fetch('/generate', {
+          method: 'POST',
+          body: formData
+        });
 
-      const json = await res.json();
-      document.getElementById('result').innerHTML = `
-        <h3>Генерирана обява:</h3>
-        <p>${json.generated_ad}</p>
-        ${json.image_urls.map(url => `<img src="${url}" width="200" style="margin:10px;">`).join('')}
-      `;
+        const json = await res.json();
+
+        document.getElementById('result').innerHTML = `
+          <h3>Генерирана обява:</h3>
+          <p>${json.generated_ad}</p>
+          ${(json.image_urls || []).map(url => `<img src="${url}" width="200" style="margin:10px;">`).join('')}
+        `;
+
+      } catch (err) {
+        document.getElementById('result').innerHTML = `<p style="color:red;">Грешка при изпращане на заявка.</p>`;
+        console.error(err);
+      }
     });
   </script>
 </body>
