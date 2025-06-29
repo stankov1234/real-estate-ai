@@ -167,23 +167,6 @@
             background-color: #38a169; /* green-600 */
             transform: translateY(-2px);
         }
-        .pdf-button { /* New style for PDF button */
-            padding: 0.75rem 1rem;
-            border: none;
-            border-radius: 0.5rem;
-            background-color: #e3a008; /* yellow-600 */
-            color: white;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.2s;
-            margin-top: 1rem;
-            width: 100%;
-        }
-        .pdf-button:hover {
-            background-color: #c07c04; /* yellow-700 */
-            transform: translateY(-2px);
-        }
         .hidden-field { /* For dynamically hidden fields */
             display: none;
         }
@@ -272,7 +255,7 @@
 
             <!-- Specific fields for HOUSE -->
             <div class="form-group house-specific">
-                <label for="yard_area"><i class="fas fa-tree"></i> Площ на двор (кв.м):</label>
+                <label for="yard_area"><i class="fas fa-tree"></i> Площ на двор (кв.m):</label>
                 <input type="number" id="yard_area" name="yard_area" placeholder="100">
             </div>
             <div class="form-group house-specific">
@@ -326,7 +309,7 @@
 
             <!-- Specific fields for BUILDING -->
             <div class="form-group building-specific">
-                <label for="total_built_up_area"><i class="fas fa-building"></i> Обща РЗП (кв.м):</label>
+                <label for="total_built_up_area"><i class="fas fa-building"></i> Обща РЗП (кв.m):</label>
                 <input type="number" id="total_built_up_area" name="total_built_up_area" placeholder="500">
             </div>
             <div class="form-group building-specific">
@@ -370,7 +353,7 @@
             <h3><i class="fas fa-file-alt"></i> Дълга Обява:</h3>
             <p id="generated-long-ad-text" class="generated-ad-text"></p>
             <button class="copy-button" onclick="copyToClipboard('generated-long-ad-text')"><i class="fas fa-copy"></i> Копирай дълга обява</button>
-            <button class="pdf-button" id="generatePdfButton" style="display:none;"><i class="fas fa-file-pdf"></i> Генерирай PDF с обявата</button>
+            <!-- PDF button removed -->
         </div>
         
         <p class="error-message" id="ad-error-message" style="display:none;"></p>
@@ -378,14 +361,14 @@
     </div>
 
     <script>
-        // Global variables to store generated ad text and images for PDF
-        let currentLongAdText = '';
-        let currentImagesForPdf = [];
+        // Global variables to store generated ad text and images for PDF - removed as PDF is removed
+        // let currentLongAdText = '';
+        // let currentImagesForPdf = [];
 
 
         const propertyTypeSelector = document.getElementById('property_type');
         const specificFields = {
-            'Апартамент': ['floor'], // Removed 'floor' from global list if it's only apartment/house specific
+            'Апартамент': ['floor'],
             'Къща': ['floor', 'yard_area', 'number_of_floors', 'heating_system', 'pool', 'garden'],
             'Парцел': ['zoning', 'utilities', 'access_road'],
             'Магазин/Обект': ['commercial_type', 'foot_traffic', 'current_business', 'facilities'],
@@ -448,9 +431,8 @@
             document.getElementById('ad-error-message').style.display = 'none';
             document.getElementById('generated-short-ad-text').innerHTML = '';
             document.getElementById('generated-long-ad-text').innerHTML = '';
-            document.getElementById('generatePdfButton').style.display = 'none'; // Hide PDF button initially
 
-            // Resize and read images as base64 and display previews
+            // Read images as base64 and display previews
             const readFilePromises = [];
             const MAX_SIZE = 1024; // Max width/height of the resized image
             const QUALITY = 0.7; // JPEG quality (0 to 1)
@@ -541,13 +523,6 @@
                 document.getElementById('short-ad-section').style.display = 'block';
                 document.getElementById('long-ad-section').style.display = 'block';
 
-                // Store for PDF generation
-                currentLongAdText = result.long_ad;
-                currentImagesForPdf = base64Images; // Use the resized base64 images for PDF
-                
-                document.getElementById('generatePdfButton').style.display = 'block'; // Show PDF button
-
-
             } catch (error) {
                 document.getElementById('loading-indicator').style.display = 'none';
                 document.getElementById('results-sections').style.display = 'block'; /* Show container even on error */
@@ -558,8 +533,6 @@
                 errorMessageElement.innerText = `Възникна грешка: ${error.message}`;
                 errorMessageElement.style.display = 'block';
                 console.error('Error generating ad:', error);
-
-                document.getElementById('generatePdfButton').style.display = 'none'; // Hide PDF button on error
             }
         });
 
@@ -586,47 +559,6 @@
                 document.body.removeChild(textarea);
             }
         }
-
-        // Generate PDF Button functionality
-        document.getElementById('generatePdfButton').addEventListener('click', async function() {
-            if (!currentLongAdText || currentImagesForPdf.length === 0) {
-                alert('Моля, първо генерирайте обявата със снимки.');
-                return;
-            }
-
-            try {
-                const response = await fetch('/generate_pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        ad_text: currentLongAdText, 
-                        images_for_pdf: currentImagesForPdf 
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Грешка при генериране на PDF: ${response.status} ${response.statusText}`);
-                }
-
-                // Trigger file download
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'Obyava_za_Imot.pdf';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                alert('PDF файлът е генериран и се изтегля!');
-
-            } catch (error) {
-                console.error('Error generating PDF:', error);
-                alert(`Възникна грешка при генериране на PDF: ${error.message}`);
-            }
-        });
     </script>
 </body>
 </html>
-
