@@ -78,7 +78,7 @@ def generate_ad():
                 print(f"DEBUG: Image saved: {filename}") # Debug print
             except Exception as e:
                 print(f"DEBUG ERROR: Failed to save image {filename}: {e}")
-                # If saving fails, we should still try to generate ad, but without this image
+                # Optionally, you might want to return an error or skip this image
                 pass # Continue processing even if one image fails to save
 
     # Construct the detailed prompt for the AI based on the provided data
@@ -140,7 +140,8 @@ def generate_ad():
         generated_ad = response.choices[0].message['content'].strip()
         print(f"DEBUG: OpenAI Response received. Generated ad length: {len(generated_ad)}") # Debug print
 
-    except openai.error.OpenAIError as e:
+    # Catch specific OpenAI API errors using the correct exception class for newer versions
+    except openai.APIError as e: # Corrected exception handling
         error_message = f"AI грешка: Проблем с OpenAI API: {str(e)}. Моля, проверете API ключа и лимитите си."
         print(f"DEBUG ERROR: OpenAI API Error: {error_message}") # Log error for debugging
         return jsonify({"error": error_message}), 500
@@ -175,6 +176,10 @@ def uploaded_file(filename):
     Route to serve uploaded images.
     """
     print(f"DEBUG: Serving static file: {filename} from {app.config['UPLOAD_FOLDER']}") # Debug print
+    # It's good practice to ensure the directory exists before serving to prevent errors
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        print(f"DEBUG ERROR: Upload folder not found at {app.config['UPLOAD_FOLDER']}")
+        return "Upload folder not found", 404
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # Main entry point for the Flask application
