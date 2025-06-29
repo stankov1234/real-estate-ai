@@ -153,7 +153,7 @@
 <body>
     <div class="container">
         <h2><i class="fas fa-home"></i> Генератор на обяви за имоти</h2>
-        <form id="adForm" enctype="multipart/form-data" method="POST">
+        <form id="adForm" method="POST"> <!-- Removed enctype="multipart/form-data" -->
             <div class="form-group">
                 <label for="location"><i class="fas fa-map-marker-alt"></i> Локация:</label>
                 <input type="text" id="location" name="location" placeholder="Квартал, град" required>
@@ -206,6 +206,17 @@
                 <label for="unique_features"><i class="fas fa-star"></i> Уникални предимства (свободен текст):</label>
                 <textarea id="unique_features" name="unique_features" placeholder="Просторна дневна, дизайнерски интериор, близост до парк..."></textarea>
             </div>
+            
+            <!-- New Broker Fields -->
+            <div class="form-group">
+                <label for="broker_name"><i class="fas fa-user-tie"></i> Име на брокер:</label>
+                <input type="text" id="broker_name" name="broker_name" placeholder="Станимир Станков" required>
+            </div>
+            <div class="form-group">
+                <label for="broker_phone"><i class="fas fa-phone"></i> Телефон на брокер:</label>
+                <input type="text" id="broker_phone" name="broker_phone" placeholder="0896 804 359" required>
+            </div>
+
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label for="images"><i class="fas fa-images"></i> Качи снимки на имота:</label>
                 <input type="file" id="images" name="images" accept="image/*" multiple>
@@ -223,6 +234,7 @@
         <h3><i class="fas fa-file-alt"></i> Генерирана обява:</h3>
         <p id="generated-ad-text"></p>
         <div class="image-preview-container" id="image-preview-container"></div>
+        <button id="copyAdButton" style="display:none; margin-top:1rem;"><i class="fas fa-copy"></i> Копирай обявата</button>
         <p class="error-message" id="ad-error-message" style="display:none;"></p>
     </div>
 
@@ -231,60 +243,82 @@
             e.preventDefault(); // Prevent default form submission
 
             const form = document.getElementById('adForm');
-            const formData = new FormData(form); // Use FormData for file uploads
+            const formData = new FormData(form); // Get form data including files
 
+            // Prepare data for JSON payload
+            const jsonData = {};
+            for (const [key, value] of formData.entries()) {
+                if (key !== 'images') { // Exclude images for now, will handle separately
+                    jsonData[key] = value;
+                }
+            }
+
+            // Read images as base64
+            const imageFiles = document.getElementById('images').files;
+            const base64Images = [];
+            const imagePreviewContainer = document.getElementById('image-preview-container');
+            imagePreviewContainer.innerHTML = ''; // Clear previous previews
+
+            // Display loading and clear previous results
             document.getElementById('loading-indicator').style.display = 'block';
             document.getElementById('result-container').style.display = 'none';
             document.getElementById('ad-error-message').style.display = 'none';
             document.getElementById('generated-ad-text').innerHTML = '';
-            document.getElementById('image-preview-container').innerHTML = '';
+            document.getElementById('copyAdButton').style.display = 'none'; // Hide copy button
 
 
-            try {
-                // First, check if there are files and display them immediately.
-                const files = document.getElementById('images').files;
-                const imagePreviewContainer = document.getElementById('image-preview-container');
-                imagePreviewContainer.innerHTML = ''; // Clear previous previews
-                for (let i = 0; i < files.length; i++) {
-                    const file = files[i];
-                    const reader = new FileReader();
+            // Use a Promise.all to wait for all FileReader operations to complete
+            const readFilePromises = [];
+            for (let i = 0; i < imageFiles.length; i++) {
+                const file = imageFiles[i];
+                const reader = new FileReader();
+                readFilePromises.push(new Promise((resolve) => {
                     reader.onload = (e) => {
+                        base64Images.push(e.target.result); // Add base64 string
+                        // Display preview (only if needed, backend will not return these now)
                         const img = document.createElement('img');
                         img.src = e.target.result;
                         img.alt = "Преглед на снимка";
                         imagePreviewContainer.appendChild(img);
+                        resolve();
                     };
                     reader.readAsDataURL(file);
-                }
+                }));
+            }
 
+            await Promise.all(readFilePromises); // Wait for all images to be read
 
+            jsonData.images = base64Images; // Add base64 images to JSON data
+
+            try {
                 const response = await fetch('/generate', {
                     method: 'POST',
-                    body: formData // No Content-Type header needed for FormData, browser sets it
+                    headers: { 'Content-Type': 'application/json' }, // Set content type for JSON
+                    body: JSON.stringify(jsonData) // Send JSON payload
                 });
 
                 document.getElementById('loading-indicator').style.display = 'none';
                 document.getElementById('result-container').style.display = 'block';
 
                 if (!response.ok) {
-                    const errorText = await response.text(); // Get raw text to debug
+                    const errorText = await response.text();
                     console.error('Server returned non-OK response:', response.status, response.statusText, errorText);
                     try {
-                        const errorData = JSON.parse(errorText); // Try to parse as JSON if it's an error from our Flask app
+                        const errorData = JSON.parse(errorText);
                         throw new Error(errorData.error || `Сървърна грешка: ${response.status} ${response.statusText}`);
                     } catch (jsonError) {
-                        // If it's not JSON, it's probably an HTML error page or unexpected text
                         throw new Error(`Неизвестна грешка от сървъра. Отговорът не е валиден JSON. (Status: ${response.status}) ${errorText.substring(0, 100)}...`);
                     }
                 }
 
-                const result = await response.json(); // Expect JSON response
+                const result = await response.json();
 
                 if (result.error) {
                     throw new Error(result.error);
                 }
 
                 document.getElementById('generated-ad-text').innerHTML = result.generated_ad;
+                document.getElementById('copyAdButton').style.display = 'block'; // Show copy button
 
             } catch (error) {
                 document.getElementById('loading-indicator').style.display = 'none';
@@ -293,6 +327,32 @@
                 errorMessageElement.innerText = `Възникна грешка: ${error.message}`;
                 errorMessageElement.style.display = 'block';
                 console.error('Error generating ad:', error);
+                document.getElementById('copyAdButton').style.display = 'none'; // Ensure copy button is hidden on error
+            }
+        });
+
+        // Copy Ad Button functionality
+        document.getElementById('copyAdButton').addEventListener('click', async function() {
+            const adText = document.getElementById('generated-ad-text').innerText;
+            try {
+                await navigator.clipboard.writeText(adText);
+                alert('Обявата е копирана в клипборда!'); // Temporary alert, can be custom modal
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                // Fallback for older browsers or if navigator.clipboard not available/allowed
+                const textarea = document.createElement('textarea');
+                textarea.value = adText;
+                textarea.style.position = 'fixed'; // Avoid scrolling to bottom
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('Обявата е копирана в клипборда (fallback)!');
+                } catch (err) {
+                    alert('Неуспешно копиране на обявата. Моля, копирайте ръчно.');
+                }
+                document.body.removeChild(textarea);
             }
         });
     </script>
