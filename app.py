@@ -2,7 +2,8 @@
 import os
 import json
 import base64
-from io import BytesIO 
+from io import BytesIO # To handle image data in memory
+import re # Import regular expressions for robust text processing
 
 from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 import openai
@@ -111,7 +112,8 @@ def generate_ad():
 1.  **КРАТКА ВЕРСИЯ:** Много сбита, акцентираща на основните предимства, подходяща за бързо сканиране.
 2.  **ДЪЛГА ВЕРСИЯ:** Подробна и описателна, с повече детайли за всички характеристики.
 
-**СТРИКТНО СЕ ПРИДЪРЖАЙ САМО КЪМ ФАКТИЧЕСКИ ДАННИ, ПРЕДОСТАВЕНИ В ТЕКСТА ИЛИ ВИЗУАЛНО ОТКРИТИ В ИЗОБРАЖЕНИЯТА. НЕ ИЗМИСЛЯЙ НИКАКВИ ДОПЪЛНИТЕЛНИ ХАРАКТЕРИСТИКИ ИЛИ ПРЕДИМСТВА.**
+**СТРОГО СЕ ПРИДЪРЖАЙ САМО КЪМ ФАКТИЧЕСКИ ДАННИ, ПРЕДОСТАВЕНИ В ТЕКСТА ИЛИ ВИЗУАЛНО ОТКРИТИ В ИЗОБРАЖЕНИЯТА. НЕ ИЗМИСЛЯЙ НИКАКВИ ДОПЪЛНИТЕЛНИ ХАРАКТЕРИСТИКИ ИЛИ ПРЕДИМСТВА.**
+**НЕ ВКЛЮЧВАЙ НОМЕРИРАНИ СПИСЪЦИ (1., 2., 3. и т.н.) ИЛИ ВЪТРЕШНИ МАРКЕРИ ЗА СЕКЦИИ В ГЕНЕРИРАНИЯ ТЕКСТ НА ОБЯВИТЕ. Генерирай директно съдържанието.**
 
 Анализирай внимателно предоставените изображения за ключови визуални предимства (напр. луксозен интериор, панорамна гледка, модерни уреди, простор, уют, състояние на стаите, обзавеждане, състояние на двор/градина, комуникации за парцел, лице на улица за магазин) и ги интегрирай в обявата.
 
@@ -146,32 +148,28 @@ def generate_ad():
 {f"📈 Заетост: {form_data['occupancy']}" if form_data['occupancy'] else ""}
 {f"💰 Потенциал за доход: {form_data['income_potential']}" if form_data['income_potential'] else ""}
 
---- КРАТКА ВЕРСИЯ ---
+---КРАТКА ОБЯВА START---
+💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]
+[Кратък, емоционален встъпителен ред. Кратко описание на имота, с акцент върху 2-3 най-важни характеристики за {form_data['property_type']}, открити от снимките и данните.]
+✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {form_data['installment']} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението.
+📞 За оглед: {form_data['broker_name']} – {form_data['broker_phone']}
+---КРАТКА ОБЯВА END---
 
-1.  **Заглавие (СТРОГО ТОЗИ ФОРМАТ):** "💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]"
-2.  **Основен текст (МНОГО КРАТЪК - 3-5 реда макс, без измислици):**
-    * Кратък, емоционален встъпителен ред.
-    * Кратко описание на имота, с акцент върху 2-3 най-важни характеристики за {form_data['property_type']}, открити от снимките и данните.
-    * **Финансов блок (СТРОГО ТОЗИ ТЕКСТ):**
-        "✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {form_data['installment']} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението."
-    * **Призив за действие (СТРОГО ТОЗИ ТЕКСТ):** "📞 За оглед: {form_data['broker_name']} – {form_data['broker_phone']}"
-
---- ДЪЛГА ВЕРСИЯ ---
-
-1.  **Заглавие (СТРОГО ТОЗИ ФОРМАТ):** "💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]"
-2.  **Основен текст (ПОДРОБЕН - 10-15+ реда, без измислици):**
-    * Емоционален встъпителен абзац, представящ най-големите ползи.
-    * **Ключови Характеристики (Резюме - кратък списък/редове):** Площ, Цена, Локация, Обзавеждане, и други основни, представени стегнато с емотикони. (Пример: "📐 Площ: {form_data['area']} кв.м | 💰 Цена: {form_data['price']} € | 📍 Локация: {form_data['location']} | 🛋️ Обзавеждане: {form_data['furnishing']}")
-    * Подробно описание на {form_data['property_type']}, неговото разпределение, състояние, характеристики и предимства, извлечени от снимките и данните.
-    * Информация за локацията и предимствата на квартала/района, специфични за {form_data['property_type']}.
-    * Раздел "Защо с 360ESTATE?" с акцент върху професионална подкрепа, сигурност и улеснение.
-    * Раздел "Идеален избор за:" (с 2-3 подходящи групи).
-    * **Финансов блок (СТРОГО ТОЗИ ТЕКСТ):**
-        "✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {form_data['installment']} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението."
-    * **Призив за действие (СТРОГО ТОЗИ ТЕКСТ):** "📞 За оглед: {form_data['broker_name']} – {form_data['broker_phone']}"
-3.  **Хаштагове:** Генерирай подходящи хаштагове за {form_data['property_type']} и локацията.
-
-Моля, раздели КРАТКАТА и ДЪЛГАТА обява с маркери "---КРАТКА ОБЯВА START---" и "---ДЪЛГА ОБЯВА START---" и ги завърши с "---КРАЙ ОБЯВА---"
+---ДЪЛГА ОБЯВА START---
+💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]
+[Емоционален встъпителен абзац, представящ най-големите ползи.]
+Ключови Характеристики (Резюме):
+📐 Площ: {form_data['area']} кв.м | 💰 Цена: {form_data['price']} € | 📍 Локация: {form_data['location']} | 🛋️ Обзавеждане: {form_data['furnishing']}
+[Подробно описание на {form_data['property_type']}, неговото разпределение, състояние, характеристики и предимства, извлечени от снимките и данните.]
+[Информация за локацията и предимствата на квартала/района, специфични за {form_data['property_type']}.]
+Защо с 360ESTATE?:
+[Акцент върху професионална подкрепа, сигурност и улеснение.]
+Идеален избор за:
+[2-3 подходящи групи (напр. Младо семейство, Инвестиция с висока доходност).]
+✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {form_data['installment']} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението.
+📞 За оглед: {form_data['broker_name']} – {form_data['broker_phone']}
+[Генерирай подходящи хаштагове за {form_data['property_type']} и локацията.]
+---ДЪЛГА ОБЯВА END---
 """
         messages_content = [{"type": "text", "text": base_text_prompt}]
 
@@ -188,44 +186,26 @@ def generate_ad():
         full_generated_text = response.choices[0].message.content.strip()
         print(f"DEBUG: OpenAI Response received. Full text length: {len(full_generated_text)}")
 
-        # Parse the full generated text into short and long versions
+        # Parse the full generated text into short and long versions using updated markers
         short_ad_start_marker = "---КРАТКА ОБЯВА START---"
+        short_ad_end_marker = "---КРАТКА ОБЯВА END---"
         long_ad_start_marker = "---ДЪЛГА ОБЯВА START---"
-        end_ad_marker = "---КРАЙ ОБЯВА---"
+        long_ad_end_marker = "---ДЪЛГА ОБЯВА END---"
 
         short_ad = "Неуспешно генериране на кратка обява. Моля, проверете логовете."
         long_ad = "Неуспешно генериране на дълга обява. Моля, проверете логовете."
 
-        if short_ad_start_marker in full_generated_text and long_ad_start_marker in full_generated_text:
-            # Extract content between markers
-            # Short ad part: from its marker to the long ad marker
-            start_short = full_generated_text.find(short_ad_start_marker) + len(short_ad_start_marker)
-            end_short = full_generated_text.find(long_ad_start_marker, start_short)
-            if end_short != -1:
-                short_ad_content = full_generated_text[start_short:end_short].strip()
-                if end_ad_marker in short_ad_content: # If end marker is inside short ad block
-                    short_ad = short_ad_content[:short_ad_content.find(end_ad_marker)].strip()
-                else:
-                    short_ad = short_ad_content
-            else: # Fallback if long ad marker not found after short ad marker
-                short_ad = full_generated_text[start_short:].strip()
-                if end_ad_marker in short_ad:
-                    short_ad = short_ad[:short_ad.find(end_ad_marker)].strip()
-
-
-            # Long ad part: from its marker to the final end marker
-            start_long = full_generated_text.find(long_ad_start_marker) + len(long_ad_start_marker)
-            long_ad_content = full_generated_text[start_long:].strip()
-            if end_ad_marker in long_ad_content:
-                long_ad = long_ad_content[:long_ad_content.find(end_ad_marker)].strip()
-            else:
-                long_ad = long_ad_content
-
-        else:
-            # Fallback if markers are not found, return full text as long ad and a generic short ad
-            print("DEBUG: Markers not found in AI response. Returning full text as long ad.")
-            long_ad = full_generated_text
-            short_ad = "Кратка версия не може да бъде извлечена. Моля, вижте дългата обява или проверете логовете за AI отговор."
+        # Extract Short Ad
+        start_index = full_generated_text.find(short_ad_start_marker)
+        end_index = full_generated_text.find(short_ad_end_marker)
+        if start_index != -1 and end_index != -1:
+            short_ad = full_generated_text[start_index + len(short_ad_start_marker):end_index].strip()
+        
+        # Extract Long Ad
+        start_index = full_generated_text.find(long_ad_start_marker)
+        end_index = full_generated_text.find(long_ad_end_marker)
+        if start_index != -1 and end_index != -1:
+            long_ad = full_generated_text[start_index + len(long_ad_start_marker):end_index].strip()
 
 
     except openai.APIError as e:
@@ -271,8 +251,7 @@ def generate_pdf():
     story.append(Spacer(1, 0.2 * inch))
 
     # Add ad text
-    # Try to parse and format the ad text to correctly handle paragraphs, lists, and bold text.
-    # This is a simplified approach, a more robust HTML parser would be needed for complex cases.
+    # This logic needs to be robust against AI's markdown and unexpected characters.
     lines = ad_text.split('\n')
     for line in lines:
         line = line.strip()
@@ -280,47 +259,43 @@ def generate_pdf():
             story.append(Spacer(1, 0.1 * inch))
             continue
 
-        # Basic formatting for bolding and emojis. ReportLab uses its own markup.
-        # This is an attempt to map some common formatting.
-        formatted_line = line.replace('**', '<b>').replace('__', '<b>').replace('*', '<b>') # Basic bold
-        formatted_line = formatted_line.replace('💥', '<font face="Helvetica">💥</font>') # Emojis might need specific font
-        formatted_line = formatted_line.replace('✨', '<font face="Helvetica">✨</font>')
-        formatted_line = formatted_line.replace('🔓', '<font face="Helvetica">🔓</font>')
-        formatted_line = formatted_line.replace('📌', '<font face="Helvetica">📌</font>')
-        formatted_line = formatted_line.replace('📞', '<font face="Helvetica">📞</font>')
-        formatted_line = formatted_line.replace('✅', '<font face="Helvetica">✅</font>')
-        formatted_line = formatted_line.replace('🏡', '<font face="Helvetica">🏡</font>')
-        formatted_line = formatted_line.replace('📐', '<font face="Helvetica">📐</font>')
-        formatted_line = formatted_line.replace('💰', '<font face="Helvetica">💰</font>')
-        formatted_line = formatted_line.replace('📍', '<font face="Helvetica">📍</font>')
-        formatted_line = formatted_line.replace('🛋️', '<font face="Helvetica">🛋️</font>')
-        formatted_line = formatted_line.replace('🌳', '<font face="Helvetica">🌳</font>')
-        formatted_line = formatted_line.replace('🏊', '<font face="Helvetica">🏊</font>')
-        formatted_line = formatted_line.replace('🚗', '<font face="Helvetica">🚗</font>')
-        formatted_line = formatted_line.replace('🔥', '<font face="Helvetica">🔥</font>')
-        formatted_line = formatted_line.replace('🏞️', '<font face="Helvetica">🏞️</font>')
-        formatted_line = formatted_line.replace('💧', '<font face="Helvetica">💧</font>')
-        formatted_line = formatted_line.replace('⚡', '<font face="Helvetica">⚡</font>')
-        formatted_line = formatted_line.replace('🛣️', '<font face="Helvetica">🛣️</font>')
-        formatted_line = formatted_line.replace('🛍️', '<font face="Helvetica">🛍️</font>')
-        formatted_line = formatted_line.replace('📈', '<font face="Helvetica">📈</font>')
-        formatted_line = formatted_line.replace('人🚶‍♂️', '<font face="Helvetica">🚶</font>') # Simpler representation
-        formatted_line = formatted_line.replace('🏗️', '<font face="Helvetica">🏗️</font>')
-        formatted_line = formatted_line.replace('🏘️', '<font face="Helvetica">🏘️</font>')
-        formatted_line = formatted_line.replace('🎯', '<font face="Helvetica">🎯</font>')
-        formatted_line = formatted_line.replace('💡', '<font face="Helvetica">💡</font>')
-        formatted_line = formatted_line.replace('🛗', '<font face="Helvetica">🛗</font>')
-        formatted_line = formatted_line.replace('🛌', '<font face="Helvetica">🛌</font>')
-        formatted_line = formatted_line.replace('🛀', '<font face="Helvetica">🛀</font>')
-        formatted_line = formatted_line.replace('🍽️', '<font face="Helvetica">🍽️</font>')
-        formatted_line = formatted_line.replace('🌿', '<font face="Helvetica">🌿</font>')
+        # Convert markdown bold/italic/underline to ReportLab's RML
+        # ReportLab markup: <b> bold </b>, <i> italic </i>, <u> underline </u>
+        formatted_line = line
+        
+        # Regex to replace markdown bold (**text** or __text__)
+        formatted_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', formatted_line)
+        formatted_line = re.sub(r'__(.*?)__', r'<b>\1</b>', formatted_line)
+        
+        # Regex to replace markdown italic (*text* or _text_) - ReportLab needs <i>
+        formatted_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', formatted_line)
+        formatted_line = re.sub(r'_(.*?)_', r'<i>\1</i>', formatted_line) # Careful with _ if used for spaces
+
+        # Replace common emojis with their text equivalents or simplified Unicode for PDF compatibility
+        # ReportLab has limited emoji support with default fonts.
+        emoji_map = {
+            '💥': '[ВЗРИВ]', '✨': '[ЗВЕЗДА]', '🔓': '[ОТКЛЮЧЕНО]', '📌': '[ПИН]', '📞': '[ТЕЛЕФОН]',
+            '✅': '[ОК]', '🏡': '[КЪЩА]', '📐': '[ПЛОЩ]', '💰': '[ПАРИ]', '📍': '[ЛОКАЦИЯ]',
+            '🛋️': '[МЕБЕЛИ]', '🌳': '[ДЪРВО]', '🏊': '[БАСЕЙН]', '🚗': '[КОЛА]', '🔥': '[ОГЪН]',
+            '🏞️': '[ПЕЙЗАЖ]', '💧': '[ВОДА]', '⚡': '[ЕЛЕКТРИЧЕСТВО]', '🛣️': '[ПЪТ]', '🛍️': '[МАГАЗИН]',
+            '📈': '[ГРАФИКА]', '🚶‍♂️': '[ЧОВЕК]', '🏗️': '[СТРОЕЖ]', '🏘️': '[СГРАДИ]', '🎯': '[ЦЕЛ]',
+            '💡': '[ИДЕЯ]', '🛗': '[АСАНСЬОР]', '🛌': '[СПАЛНЯ]', '🛀': '[БАНЯ]', '🍽️': '[КУХНЯ]',
+            '🌿': '[РАСТЕНИЕ]', '🏢': '[СГРАДА]', '🔑': '[КЛЮЧ]', '☀️': '[СЛЪНЦЕ]', '🌊': '[ВЪЛНИ]'
+        }
+        for emoji, text_eq in emoji_map.items():
+            formatted_line = formatted_line.replace(emoji, text_eq)
+        
+        # Remove any other complex unicode/emojis that might cause issues and are not in map
+        # This is a broad approach to prevent errors.
+        formatted_line = formatted_line.encode('ascii', 'ignore').decode('ascii')
 
 
         # Handle list items
-        if formatted_line.startswith('✅ '):
+        # Check for bullet points generated by AI
+        if formatted_line.startswith('• ') or formatted_line.startswith('- ') or formatted_line.startswith('* '):
+            story.append(Paragraph(formatted_line, styles['BulletPoint']))
+        elif formatted_line.startswith('✅ '):
             story.append(Paragraph(f'• {formatted_line[2:]}', styles['BulletPoint']))
-        elif formatted_line.startswith('- '):
-             story.append(Paragraph(f'• {formatted_line[2:]}', styles['BulletPoint']))
         else:
             story.append(Paragraph(formatted_line, styles['AdBody']))
 
