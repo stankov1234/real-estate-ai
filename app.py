@@ -67,19 +67,37 @@ def ad_generator():
 
 @app.route('/generate', methods=['POST'])
 def generate_ad():
-    """
-    Handles the ad generation form submission.
-    - Extracts data from the form.
-    - Constructs a detailed multimodal prompt for the AI based on form data and image data.
-    - Calls OpenAI API (GPT-4o) to generate two versions of the ad text (short and long).
-    - Returns the generated ad texts as a JSON response.
-    """
     print("DEBUG: generate_ad route hit!")
+    print(f"DEBUG: Request Content-Type: {request.content_type}") # Log content type of the incoming request
+    print(f"DEBUG: Request Method: {request.method}") # Log request method
 
-    # Parse JSON data from the request
-    data = request.json
-    
-    # Extract text fields
+    data = {} # Initialize data dictionary
+    try:
+        # Check if the request actually contains JSON and the content type is correct
+        if request.is_json:
+            data = request.json # Attempt to parse JSON data
+            if data is None: # In case request.json returns None for an empty/malformed body
+                print("DEBUG ERROR: request.is_json is True, but request.json returned None. Trying to load from request.data.")
+                # Attempt to load from raw data if request.json failed to parse
+                data = json.loads(request.data.decode('utf-8'))
+        elif request.content_type and 'multipart/form-data' in request.content_type:
+            print("DEBUG: Received multipart/form-data. This is unexpected for JSON API call.")
+            return jsonify({"error": "Unsupported Media Type: Очаква се 'application/json', но е получен 'multipart/form-data'. Моля, проверете изпращането на формата."}), 415
+        else:
+            # This covers cases where Content-Type is missing or not 'application/json'
+            print(f"DEBUG ERROR: Unexpected Content-Type or not JSON: {request.content_type}. Raw data: {request.data[:200]}...")
+            return jsonify({"error": f"Unsupported Media Type: {request.content_type}. Очаква се 'application/json'."}), 415
+    except json.JSONDecodeError as e:
+        print(f"DEBUG ERROR: JSONDecodeError: Failed to parse request JSON: {e}")
+        print(f"DEBUG ERROR: Raw request data: {request.data.decode('utf-8')[:500]}...") # Log raw data for debugging
+        return jsonify({"error": f"Грешка при обработка на JSON данните: {e}. Проверете формата на изпратените данни."}), 400
+    except Exception as e:
+        print(f"DEBUG ERROR: Unexpected exception during request parsing: {e}")
+        print(f"DEBUG ERROR: Raw request data: {request.data.decode('utf-8')[:500]}...")
+        return jsonify({"error": f"Грешка при обработка на заявката: {e}"}), 400
+
+
+    # Extract text fields from the parsed data
     form_data = {
         'property_type': data.get('property_type', 'Апартамент'), 
         'location': data.get('location', 'неуточнена'),
@@ -123,11 +141,6 @@ def generate_ad():
     generated_short_ad = "Възникна грешка при генерирането на кратката обява."
     generated_long_ad = "Възникна грешка при генерирането на дългата обява."
     error_message = None
-
-    # Browsing logic is removed:
-    # browsed_content = ""
-    # if form_data['existing_ad_url']:
-    #     ... (removed browsing code) ...
 
     try:
         if client is None:
@@ -294,3 +307,4 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
