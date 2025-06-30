@@ -1,15 +1,15 @@
-<!DOCTYPE html>
-<html lang="bg">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Генератор на обяви за имоти - 360ESTATE</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <style>
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;bg&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+    &lt;title&gt;Генератор на обяви за имоти - 360ESTATE&lt;/title&gt;
+    &lt;link href=&quot;https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css&quot; rel=&quot;stylesheet&quot;&gt;
+    &lt;style&gt;
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Tailwind's gray-900 equivalent */
-            color: #e2e8f0; /* Tailwind's gray-200 equivalent */
+            font-family: &#39;Inter&#39;, sans-serif;
+            background-color: #1a202c; /* Tailwind&#39;s gray-900 equivalent */
+            color: #e2e8f0; /* Tailwind&#39;s gray-200 equivalent */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -19,7 +19,7 @@
             box-sizing: border-box;
         }
         .container {
-            background-color: #2d3748; /* Tailwind's gray-800 equivalent */
+            background-color: #2d3748; /* Tailwind&#39;s gray-800 equivalent */
             padding: 2.5rem;
             border-radius: 0.75rem; /* rounded-lg */
             box-shadow: 0 10px 15px rgba(0, 0, 0, 0.25); /* shadow-xl */
@@ -40,11 +40,11 @@
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1rem;
         }
-        input[type="text"],
-        input[type="number"],
+        input[type=&quot;text&quot;],
+        input[type=&quot;number&quot;],
         textarea,
         select, /* Added select for property type */
-        input[type="file"] {
+        input[type=&quot;file&quot;] {
             width: calc(100% - 2rem);
             padding: 0.75rem 1rem;
             border: 1px solid #4a5568; /* gray-600 */
@@ -61,11 +61,11 @@
             min-height: 100px;
             resize: vertical;
         }
-        input[type="text"]:focus,
-        input[type="number"]:focus,
+        input[type=&quot;text&quot;]:focus,
+        input[type=&quot;number&quot;]:focus,
         textarea:focus,
         select:focus,
-        input[type="file"]:focus {
+        input[type=&quot;file&quot;]:focus {
             border-color: #63b3ed; /* blue-400 */
         }
         label {
@@ -175,388 +175,20 @@
         .building-specific.form-group {
             display: none;
         }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2><i class="fas fa-home"></i> Генератор на обяви за имоти</h2>
-        <form id="adForm" method="POST" action="/generate"> <!-- Corrected: Added action="/generate" -->
-            <!-- Property Type Selector -->
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="property_type"><i class="fas fa-building"></i> Тип имот:</label>
-                <select id="property_type" name="property_type" required>
-                    <option value="Апартамент" selected>Апартамент</option> <!-- Default selected -->
-                    <option value="Къща">Къща</option>
-                    <option value="Парцел">Парцел</option>
-                    <option value="Магазин/Обект">Магазин/Обект</option>
-                    <option value="Сграда">Сграда</option>
-                </select>
-            </div>
-
-            <!-- Common Fields (always visible) -->
-            <div class="form-group">
-                <label for="location"><i class="fas fa-map-marker-alt"></i> Локация:</label>
-                <input type="text" id="location" name="location" placeholder="Квартал, град" required>
-            </div>
-            <div class="form-group">
-                <label for="price"><i class="fas fa-euro-sign"></i> Цена (€):</label>
-                <input type="number" id="price" name="price" placeholder="150000" required>
-            </div>
-            <div class="form-group">
-                <label for="area"><i class="fas fa-ruler-combined"></i> Площ (кв.м):</label>
-                <input type="number" id="area" name="area" placeholder="90" required>
-            </div>
-            <div class="form-group">
-                <label for="year_built"><i class="fas fa-calendar-alt"></i> Година на строеж:</label>
-                <input type="number" id="year_built" name="year_built" placeholder="2018">
-            </div>
-            <div class="form-group">
-                <label for="installment"><i class="fas fa-money-check-alt"></i> Месечна вноска (€):</label>
-                <input type="number" id="installment" name="installment" placeholder="580" required>
-            </div>
-            <div class="form-group">
-                <label for="furnishing"><i class="fas fa-couch"></i> Обзавеждане:</label>
-                <input type="text" id="furnishing" name="furnishing" placeholder="Напълно обзаведен / Частично / Без">
-            </div>
-            <div class="form-group">
-                <label for="panorama"><i class="fas fa-mountain"></i> Панорама:</label>
-                <input type="text" id="panorama" name="panorama" placeholder="Да / Не / Морска / Градска">
-            </div>
-            <div class="form-group">
-                <label for="elevator"><i class="fas fa-elevator"></i> Асансьор:</label>
-                <input type="text" id="elevator" name="elevator" placeholder="Да / Не">
-            </div>
-            <div class="form-group">
-                <label for="garage"><i class="fas fa-car-alt"></i> Гараж:</label>
-                <input type="text" id="garage" name="garage" placeholder="Да / Не / Опция">
-            </div>
-            <div class="form-group">
-                <label for="exclusive"><i class="fas fa-handshake"></i> Ексклузивност (360ESTATE):</label>
-                <input type="text" id="exclusive" name="exclusive" placeholder="Да / Не">
-            </div>
-            <div class="form-group">
-                <label for="financing"><i class="fas fa-coins"></i> Финансиране (допълнително инфо):</label>
-                <input type="text" id="financing" name="financing" placeholder="Чрез Банков Ипотечен Кредит">
-            </div>
-            <div class="form-group">
-                <label for="broker_name"><i class="fas fa-user-tie"></i> Име на брокер:</label>
-                <input type="text" id="broker_name" name="broker_name" placeholder="Станимир Станков" required>
-            </div>
-            <div class="form-group">
-                <label for="broker_phone"><i class="fas fa-phone"></i> Телефон на брокер:</label>
-                <input type="text" id="broker_phone" name="broker_phone" placeholder="0896 804 359" required>
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="unique_features"><i class="fas fa-star"></i> Уникални предимства (свободен текст):</label>
-                <textarea id="unique_features" name="unique_features" placeholder="Просторна дневна, дизайнерски интериор, близост до парк..."></textarea>
-            </div>
-            
-            <!-- Specific fields for APARTMENT / HOUSE -->
-            <div class="form-group apartment house-specific">
-                <label for="floor"><i class="fas fa-layer-group"></i> Етаж:</label>
-                <input type="text" id="floor" name="floor" placeholder="2 / Последен">
-            </div>
-
-            <!-- Specific fields for HOUSE -->
-            <div class="form-group house-specific">
-                <label for="yard_area"><i class="fas fa-tree"></i> Площ на двор (кв.m):</label>
-                <input type="number" id="yard_area" name="yard_area" placeholder="100">
-            </div>
-            <div class="form-group house-specific">
-                <label for="number_of_floors"><i class="fas fa-hotel"></i> Брой етажи:</label>
-                <input type="number" id="number_of_floors" name="number_of_floors" placeholder="2">
-            </div>
-            <div class="form-group house-specific">
-                <label for="heating_system"><i class="fas fa-fire"></i> Отопление:</label>
-                <input type="text" id="heating_system" name="heating_system" placeholder="Локално / Газ / Електричество">
-            </div>
-            <div class="form-group house-specific">
-                <label for="pool"><i class="fas fa-swimming-pool"></i> Басейн:</label>
-                <input type="text" id="pool" name="pool" placeholder="Да / Не">
-            </div>
-            <div class="form-group house-specific">
-                <label for="garden"><i class="fas fa-seedling"></i> Градина:</label>
-                <input type="text" id="garden" name="garden" placeholder="Да / Не">
-            </div>
-
-            <!-- Specific fields for PLOT -->
-            <div class="form-group plot-specific">
-                <label for="zoning"><i class="fas fa-chart-area"></i> Зониране/Предназначение:</label>
-                <input type="text" id="zoning" name="zoning" placeholder="За жилищно строителство / Промишлено">
-            </div>
-            <div class="form-group plot-specific">
-                <label for="utilities"><i class="fas fa-faucet"></i> Комуникации:</label>
-                <input type="text" id="utilities" name="utilities" placeholder="Ток, Вода, Канал, Газ">
-            </div>
-            <div class="form-group plot-specific">
-                <label for="access_road"><i class="fas fa-road"></i> Достъп до път:</label>
-                <input type="text" id="access_road" name="access_road" placeholder="Асфалт / Макaдам">
-            </div>
-
-            <!-- Specific fields for SHOP/COMMERCIAL PROPERTY -->
-            <div class="form-group shop-specific">
-                <label for="commercial_type"><i class="fas fa-store"></i> Тип обект:</label>
-                <input type="text" id="commercial_type" name="commercial_type" placeholder="Магазин / Офис / Ресторант">
-            </div>
-            <div class="form-group shop-specific">
-                <label for="foot_traffic"><i class="fas fa-walking"></i> Поток от хора:</label>
-                <input type="text" id="foot_traffic" name="foot_traffic" placeholder="Висок / Среден / Нисък">
-            </div>
-            <div class="form-group shop-specific">
-                <label for="current_business"><i class="fas fa-briefcase"></i> Настоящ бизнес:</label>
-                <input type="text" id="current_business" name="current_business" placeholder="Аптека / Фризьорски салон / Няма">
-            </div>
-            <div class="form-group shop-specific">
-                <label for="facilities"><i class="fas fa-toilet"></i> Удобства в обекта:</label>
-                <input type="text" id="facilities" name="facilities" placeholder="Баня, Склад, Офис зона">
-            </div>
-
-            <!-- Specific fields for BUILDING -->
-            <div class="form-group building-specific">
-                <label for="total_built_up_area"><i class="fas fa-building"></i> Обща РЗП (кв.m):</label>
-                <input type="number" id="total_built_up_area" name="total_built_up_area" placeholder="500">
-            </div>
-            <div class="form-group building-specific">
-                <label for="number_of_units"><i class="fas fa-boxes"></i> Брой обекти/единици:</label>
-                <input type="number" id="number_of_units" name="number_of_units" placeholder="5 апартамента / 3 офиса">
-            </div>
-            <div class="form-group building-specific">
-                <label for="occupancy"><i class="fas fa-user-check"></i> Заетост (%):</label>
-                <input type="text" id="occupancy" name="occupancy" placeholder="100% / 50% / Свободна">
-            </div>
-            <div class="form-group building-specific">
-                <label for="income_potential"><i class="fas fa-money-bill-wave"></i> Потенциал за доход:</label>
-                <input type="text" id="income_potential" name="income_potential" placeholder="Висок / Среден / Нисък">
-            </div>
-            
-            <!-- Image Upload Field (always visible) -->
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="images"><i class="fas fa-images"></i> Качи снимки на имота:</label>
-                <input type="file" id="images" name="images" accept="image/*" multiple>
-            </div>
-
-            <button type="submit"><i class="fas fa-magic"></i> Генерирай Обява</button>
-        </form>
-    </div>
-
-    <div id="loading-indicator">
-        <i class="fas fa-spinner fa-spin"></i> Генериране на обява... Моля, изчакайте.
-    </div>
-
-    <!-- Results Section -->
-    <div id="results-sections" style="display:none;">
-        <!-- Short Ad Result -->
-        <div class="result-section" id="short-ad-section">
-            <h3><i class="fas fa-file-alt"></i> Кратка Обява:</h3>
-            <p id="generated-short-ad-text" class="generated-ad-text"></p>
-            <button class="copy-button" onclick="copyToClipboard('generated-short-ad-text')"><i class="fas fa-copy"></i> Копирай кратка обява</button>
-        </div>
-
-        <!-- Long Ad Result -->
-        <div class="result-section" id="long-ad-section" style="margin-top:2rem;">
-            <h3><i class="fas fa-file-alt"></i> Дълга Обява:</h3>
-            <p id="generated-long-ad-text" class="generated-ad-text"></p>
-            <button class="copy-button" onclick="copyToClipboard('generated-long-ad-text')"><i class="fas fa-copy"></i> Копирай дълга обява</button>
-        </div>
-        
-        <p class="error-message" id="ad-error-message" style="display:none;"></p>
-        <div class="image-preview-container" id="image-preview-container"></div>
-    </div>
-
-    <script defer> /* Added 'defer' attribute here */
-        const propertyTypeSelector = document.getElementById('property_type');
-        const specificFields = {
-            'Апартамент': ['floor'],
-            'Къща': ['floor', 'yard_area', 'number_of_floors', 'heating_system', 'pool', 'garden'],
-            'Парцел': ['zoning', 'utilities', 'access_road'],
-            'Магазин/Обект': ['commercial_type', 'foot_traffic', 'current_business', 'facilities'],
-            'Сграда': ['total_built_up_area', 'number_of_units', 'occupancy', 'income_potential']
-        };
-
-        // Function to show/hide fields based on property type
-        function toggleSpecificFields() {
-            // Hide all specific fields first
-            document.querySelectorAll('.apartment.form-group, .house-specific.form-group, .plot-specific.form-group, .shop-specific.form-group, .building-specific.form-group').forEach(el => {
-                el.style.display = 'none';
-                // Clear their values when hidden
-                el.querySelectorAll('input, select, textarea').forEach(input => input.value = '');
-            });
-
-            // Show relevant fields
-            const selectedType = propertyTypeSelector.value;
-            if (selectedType) {
-                // Common fields for apartment/house (like floor)
-                if (selectedType === 'Апартамент' || selectedType === 'Къща') {
-                    document.querySelectorAll('.apartment').forEach(el => el.style.display = 'block');
-                }
-                if (specificFields[selectedType]) {
-                    specificFields[selectedType].forEach(fieldId => {
-                        const fieldElement = document.getElementById(fieldId);
-                        if (fieldElement && fieldElement.closest('.form-group')) {
-                            fieldElement.closest('.form-group').style.display = 'block';
-                        }
-                    });
-                }
-            }
-        }
-
-        // Initial call on load
-        toggleSpecificFields();
-        // Add event listener for changes in property type
-        propertyTypeSelector.addEventListener('change', toggleSpecificFields);
-
-
-        document.getElementById('adForm').addEventListener('submit', async function (e) {
-            e.preventDefault(); 
-
-            const form = document.getElementById('adForm');
-            const formData = new FormData(form);
-
-            const jsonData = {};
-            for (const [key, value] of formData.entries()) {
-                if (key !== 'images') {
-                    jsonData[key] = value;
-                }
-            }
-
-            const imageFiles = document.getElementById('images').files;
-            const base64Images = [];
-            const imagePreviewContainer = document.getElementById('image-preview-container');
-            imagePreviewContainer.innerHTML = ''; 
-
-            document.getElementById('loading-indicator').style.display = 'block';
-            document.getElementById('results-sections').style.display = 'none';
-            document.getElementById('ad-error-message').style.display = 'none';
-            document.getElementById('generated-short-ad-text').innerHTML = '';
-            document.getElementById('generated-long-ad-text').innerHTML = '';
-
-            // Read images as base64 and display previews
-            const readFilePromises = [];
-            const MAX_SIZE = 1024; // Max width/height of the resized image
-            const QUALITY = 0.7; // JPEG quality (0 to 1)
-
-            for (let i = 0; i < imageFiles.length; i++) {
-                const file = imageFiles[i];
-                if (!file.type.startsWith('image/')) {
-                    console.warn(`Skipping non-image file: ${file.name}`);
-                    continue;
-                }
-
-                readFilePromises.push(new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            let width = img.width;
-                            let height = img.height;
-
-                            // Calculate new dimensions
-                            if (width > height) {
-                                if (width > MAX_SIZE) {
-                                    height *= MAX_SIZE / width;
-                                    width = MAX_SIZE;
-                                }
-                            } else {
-                                if (height > MAX_SIZE) {
-                                    width *= MAX_SIZE / height;
-                                    height = MAX_SIZE;
-                                }
-                            }
-
-                            canvas.width = width;
-                            canvas.height = height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, width, height);
-
-                            // Convert to base64 (JPEG for better compression)
-                            const resizedBase64 = canvas.toDataURL('image/jpeg', QUALITY);
-                            base64Images.push(resizedBase64);
-
-                            // Display preview (for user feedback)
-                            const previewImg = document.createElement('img');
-                            previewImg.src = resizedBase64;
-                            previewImg.alt = "Преглед на снимка";
-                            imagePreviewContainer.appendChild(previewImg);
-                            resolve();
-                        };
-                        img.src = e.target.result;
-                    };
-                    reader.readAsDataURL(file);
-                }));
-            }
-            await Promise.all(readFilePromises); 
-
-            jsonData.images = base64Images; // Add base64 images to JSON data
-
-            try {
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(jsonData)
-                });
-
-                document.getElementById('loading-indicator').style.display = 'none';
-                document.getElementById('results-sections').style.display = 'block';
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Server returned non-OK response:', response.status, response.statusText, errorText);
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        throw new Error(errorData.error || `Сървърна грешка: ${response.status} ${response.statusText}`);
-                    } catch (jsonError) {
-                        throw new Error(`Неизвестна грешка от сървъра. Отговорът не е валиден JSON. (Status: ${response.status}) ${errorText.substring(0, 100)}...`);
-                    }
-                }
-
-                const result = await response.json();
-
-                if (result.error) {
-                    throw new Error(result.error);
-                }
-
-                document.getElementById('generated-short-ad-text').innerHTML = result.short_ad;
-                document.getElementById('generated-long-ad-text').innerHTML = result.long_ad;
-                document.getElementById('short-ad-section').style.display = 'block';
-                document.getElementById('long-ad-section').style.display = 'block';
-
-            } catch (error) {
-                document.getElementById('loading-indicator').style.display = 'none';
-                document.getElementById('results-sections').style.display = 'block'; /* Show container even on error */
-                document.getElementById('short-ad-section').style.display = 'none'; /* Hide ad sections */
-                document.getElementById('long-ad-section').style.display = 'none';
-                
-                const errorMessageElement = document.getElementById('ad-error-message');
-                errorMessageElement.innerText = `Възникна грешка: ${error.message}`;
-                errorMessageElement.style.display = 'block';
-                console.error('Error generating ad:', error);
-            }
-        });
-
-        // Copy Ad Button functionality
-        async function copyToClipboard(elementId) {
-            const adText = document.getElementById(elementId).innerText;
-            try {
-                await navigator.clipboard.writeText(adText);
-                alert('Обявата е копирана в клипборда!');
-            } catch (err) {
-                console.error('Failed to copy text: ', err);
-                const textarea = document.createElement('textarea');
-                textarea.value = adText;
-                textarea.style.position = 'fixed';
-                document.body.appendChild(textarea);
-                textarea.focus();
-                textarea.select();
-                try {
-                    document.execCommand('copy');
-                    alert('Обявата е копирана в клипборда (fallback)!');
-                } catch (err) {
-                    alert('Неуспешно копиране на обявата. Моля, копирайте ръчно.');
-                }
-                document.body.removeChild(textarea);
-            }
-        });
-    </script>
-</body>
-</html>
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div class=&quot;container&quot;&gt;
+        &lt;h2&gt;&lt;i class=&quot;fas fa-home&quot;&gt;&lt;/i&gt; Генератор на обяви за имоти&lt;/h2&gt;
+        &lt;form id=&quot;adForm&quot; method=&quot;POST&quot; action=&quot;/generate&quot;&gt; &lt;!-- Corrected: Added action=&quot;/generate&quot; --&gt;
+            &lt;!-- Property Type Selector --&gt;
+            &lt;div class=&quot;form-group&quot; style=&quot;grid-column: 1 / -1;&quot;&gt;
+                &lt;label for=&quot;property_type&quot;&gt;&lt;i class=&quot;fas fa-building&quot;&gt;&lt;/i&gt; Тип имот:&lt;/label&gt;
+                &lt;select id=&quot;property_type&quot; name=&quot;property_type&quot; required&gt;
+                    &lt;option value=&quot;Апартамент&quot; selected&gt;Апартамент&lt;/option&gt; &lt;!-- Default selected --&gt;
+                    &lt;option value=&quot;Къща&quot;&gt;Къща&lt;/option&gt;
+                    &lt;option value=&quot;Парцел&quot;&gt;Парцел&lt;/option&gt;
+                    &lt;option value=&quot;Магазин/Обект&quot;&gt;Магазин/Обект&lt;/option&gt;
+                    &lt;option value=&quot;Сграда&quot;&gt;Сграда&lt;/option&gt;
+                &lt;/select&gt;
+            &lt;/div&gt;
