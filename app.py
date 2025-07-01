@@ -2,15 +2,13 @@
 import os
 import json
 import base64
-from io import BytesIO 
-import re 
+from io import BytesIO
+import re
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+# Import send_from_directory for serving static files
+from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory
 import openai
 from werkzeug.utils import secure_filename
-
-# The browsing tool import is removed:
-# import browsing 
 
 # Initialize the Flask application
 app = Flask(__name__, template_folder='templates', static_folder='static')
@@ -22,6 +20,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Configure OpenAI API client
 try:
+    # Ensure OPENAI_API_KEY is set in your environment variables
+    # For local testing, you might set it directly: os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     print("DEBUG: OpenAI client initialized successfully.")
 except Exception as e:
@@ -78,11 +78,18 @@ def generate_ad():
 
     # Parse JSON data from the request
     # Frontend sends all form data and base64 images in a single JSON payload.
-    data = request.json
-    
+    # Flask's request.json automatically handles the 'application/json' content type.
+    try:
+        data = request.json
+        if data is None:
+            raise ValueError("No JSON data received. Content-Type might be incorrect or body is empty.")
+    except Exception as e:
+        print(f"DEBUG ERROR: Failed to parse JSON data: {e}")
+        return jsonify({"error": f"Грешка при обработка на JSON данните: {e}. Уверете се, че Content-Type е 'application/json'."}), 400
+
     # Extract text fields from the parsed JSON data
     form_data = {
-        'property_type': data.get('property_type', 'Апартамент'), 
+        'property_type': data.get('property_type', 'Апартамент'),
         'location': data.get('location', 'неуточнена'),
         'price': data.get('price', 'неуточнена'),
         'area': data.get('area', 'неуточнена'),
@@ -96,8 +103,8 @@ def generate_ad():
         'exclusive': data.get('exclusive', 'неуточнена'),
         'financing': data.get('financing', 'неуточнено'),
         'unique_features': data.get('unique_features', 'неуточнени'),
-        'broker_name': data.get('broker_name', 'брокер'), 
-        'broker_phone': data.get('broker_phone', 'неуточнен телефон'), 
+        'broker_name': data.get('broker_name', 'брокер'),
+        'broker_phone': data.get('broker_phone', 'неуточнен телефон'),
         # Specific fields for different property types (empty string if not provided)
         'yard_area': data.get('yard_area', ''),
         'number_of_floors': data.get('number_of_floors', ''),
@@ -176,23 +183,23 @@ def generate_ad():
 
 ---КРАТКА ОБЯВА START---
 
-Заглавие: 
+Заглавие:
 💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]
-Откриващ текст: 
+Откриващ текст:
 🏡 [Кратко и ясно, едно вдъхновяващо изречение, което подчертава готовност за нанасяне или финансова достъпност. Веднага след това основните параметри на имота: {form_data['area']} кв.м | САМО {form_data['price']} € | {form_data['location']}]
-Разсрочено плащане: 
+Разсрочено плащане:
 ✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {form_data['installment']} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението.
-За оглед: 
+За оглед:
 📞 {form_data['broker_name']} – {form_data['broker_phone']}
 ---КРАТКА ОБЯВА END---
 
 ---ДЪЛГА ОБЯВА START---
 
-Заглавие: 
+Заглавие:
 💥 Купи за {form_data['installment']} €/месец – [2-3 най-силни, ключови предимства, извлечени от данните и снимките, релевантни за {form_data['property_type']}]
-Откриващ текст: 
+Откриващ текст:
 🏡 [Кратко и ясно, едно вдъхновяващо изречение, което подчертава готовност за нанасяне или финансова достъпност, преплетено с основните характеристики: цена {form_data['price']} €, местоположение {form_data['location']} и вид имот {form_data['property_type']}].
-Разсрочено плащане: 
+Разсрочено плащане:
 ✨ Този имот може да бъде закупен на разсрочено плащане чрез Банков Ипотечен Кредит с месечна вноска от {form_data['installment']} €.\n🔓Без начален капитал, без доказани доходи или с влошена кредитна история – ние съдействаме за успешно банково финансиране.\n📌 Финансирането не е пречка – то е част от решението.
 Описание на имота:
 [Подробно описание на {form_data['property_type']}, неговото разпределение, състояние, екстри и ключови подобрения. Започни тази секция с кратко резюме на основните параметри: 📐 Площ: {form_data['area']} кв.м | 💰 Цена: {form_data['price']} € | 📍 Локация: {form_data['location']} | 🛋️ Обзавеждане: {form_data['furnishing']} . AI ще интегрира и визуално откритите предимства от снимките.]
@@ -204,7 +211,7 @@ def generate_ad():
 [Акцент върху 🤝 професионална подкрепа, ✅ сигурност и 🚀 улеснение.]
 Идеален избор за:
 [🎯 2-3 подходящи групи (напр. 👨‍👩‍👧‍👦 Младо семейство, 📈 Инвестиция с висока доходност, 🏖️ Втори дом край морето).]
-За оглед: 
+За оглед:
 📞 {form_data['broker_name']} – {form_data['broker_phone']}
 Финален щрих: [Генерирай кратко, емоционално заключение, което да остави силно впечатление (напр. "Тук не просто купувате апартамент – купувате стил на живот.").]
 Хаштагове: [Генерирай подходящи хаштагове за {form_data['property_type']} и локацията.]
@@ -222,8 +229,7 @@ def generate_ad():
             temperature=0.8,
             max_tokens=2500 # Increased max_tokens to ensure enough space for detailed output
         )
-        full_generated_text = response.choices[0].message.content.strip() # Removed .content.
-        
+        full_generated_text = ""
         # Check if message is a ChatCompletionMessage and has 'content' attribute
         if hasattr(response.choices[0].message, 'content') and response.choices[0].message.content is not None:
             full_generated_text = response.choices[0].message.content.strip()
