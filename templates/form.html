@@ -251,14 +251,6 @@
                 <textarea id="unique_features" name="unique_features" placeholder="Просторна дневна, дизайнерски интериор, близост до парк..."></textarea>
             </div>
             
-            <!-- Removed field for existing ad URL -->
-            <!--
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="existing_ad_url"><i class="fas fa-link"></i> Линк към съществуваща обява (приоритетна информация):</label>
-                <input type="text" id="existing_ad_url" name="existing_ad_url" placeholder="https://www.imot.bg/obiava-...">
-            </div>
-            -->
-
             <!-- Specific fields for APARTMENT / HOUSE -->
             <div class="form-group apartment house-specific">
                 <label for="floor"><i class="fas fa-layer-group"></i> Етаж:</label>
@@ -371,7 +363,7 @@
         <div class="image-preview-container" id="image-preview-container"></div>
     </div>
 
-    <script>
+    <script defer> /* Added 'defer' attribute here */
         const propertyTypeSelector = document.getElementById('property_type');
         const specificFields = {
             'Апартамент': ['floor'],
