@@ -17,7 +17,7 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # Define the folder for uploading images (primarily for historical reference or direct serving if needed)
 UPLOAD_FOLDER = 'static/uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True) # Ensures the directory exists on local runs
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Configure OpenAI API client
@@ -29,9 +29,9 @@ except Exception as e:
     client = None
 
 # Define the application password
-APP_PASSWORD = "360estate"
+APP_PASSWORD = "360estate" # The password for your team
 
-# --- Routes for the application ---
+# --- Application Routes ---
 
 @app.route('/')
 def index():
@@ -46,7 +46,7 @@ def login():
     """
     Handles the login form submission.
     Checks if the entered password matches the APP_PASSWORD.
-    If correct, redirects to the ad generator form.
+    If correct, redirects the user to the ad generator form.
     """
     password = request.form.get("password")
     if password == APP_PASSWORD:
@@ -77,9 +77,10 @@ def generate_ad():
     print("DEBUG: generate_ad route hit!")
 
     # Parse JSON data from the request
+    # Frontend sends all form data and base64 images in a single JSON payload.
     data = request.json
     
-    # Extract text fields
+    # Extract text fields from the parsed JSON data
     form_data = {
         'property_type': data.get('property_type', 'Апартамент'), 
         'location': data.get('location', 'неуточнена'),
@@ -97,7 +98,7 @@ def generate_ad():
         'unique_features': data.get('unique_features', 'неуточнени'),
         'broker_name': data.get('broker_name', 'брокер'), 
         'broker_phone': data.get('broker_phone', 'неуточнен телефон'), 
-        # Specific fields for different property types
+        # Specific fields for different property types (empty string if not provided)
         'yard_area': data.get('yard_area', ''),
         'number_of_floors': data.get('number_of_floors', ''),
         'heating_system': data.get('heating_system', ''),
@@ -114,29 +115,26 @@ def generate_ad():
         'number_of_units': data.get('number_of_units', ''),
         'occupancy': data.get('occupancy', ''),
         'income_potential': data.get('income_potential', ''),
-        # 'existing_ad_url' field is removed from here
     }
 
-    # Extract base64 image data (still used by AI for vision)
+    # Extract base64 image data (used by AI for vision)
+    # Images are sent from frontend as base64 strings in the JSON payload.
     image_data_base64 = data.get('images', [])
 
+    # Initialize ad output variables
     generated_short_ad = "Възникна грешка при генерирането на кратката обява."
     generated_long_ad = "Възникна грешка при генерирането на дългата обява."
     error_message = None
 
-    # Browsing logic is removed:
-    # browsed_content = ""
-    # if form_data['existing_ad_url']:
-    #     ... (removed browsing code) ...
-
     try:
+        # Check if OpenAI client was successfully initialized
         if client is None:
             raise ValueError("OpenAI клиентът не е инициализиран. API ключът може да липсва или да е невалиден.")
 
         print("DEBUG: OpenAI client is ready for vision model.")
 
-        # Construct basic text prompt based on property type and all available data
-        # Prompt is reverted to prior version that doesn't prioritize browsed content.
+        # Construct the detailed prompt for the AI based on all input data and images.
+        # This prompt is structured to strictly adhere to the user's defined format, including specific sections and their order.
         base_text_prompt = f"""
 Ти си експерт по имотни обяви и маркетинг за недвижими и имоти. Твоята задача е да създадеш ДВЕ ВЕРСИИ на обява за продажба на имот, съобразена с Facebook Marketplace. Всяка обява трябва да следва стриктно дефинираните секции и техния ред.
 
