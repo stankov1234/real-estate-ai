@@ -9,30 +9,29 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for
 import openai
 from werkzeug.utils import secure_filename
 
+# The browsing tool import is removed:
+# import browsing 
+
 # Initialize the Flask application
-# Set template_folder for HTML files and static_folder for static assets like images.
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
-# Define the folder for uploading images (for AI vision and potential future use)
-# It's crucial this directory exists and is committed to your GitHub repo (e.g., with a .gitkeep file inside).
+# Define the folder for uploading images (primarily for historical reference or direct serving if needed)
 UPLOAD_FOLDER = 'static/uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True) # Ensures the directory exists on local runs
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Configure OpenAI API client
-# The API key is automatically picked up from the OPENAI_API_KEY environment variable on Render.
 try:
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     print("DEBUG: OpenAI client initialized successfully.")
 except Exception as e:
     print(f"DEBUG ERROR: Failed to initialize OpenAI client: {e}")
-    client = None # Set client to None if initialization fails
+    client = None
 
-# Define the application password for authentication
-# For simplicity, password is hardcoded. In production, use more secure methods.
+# Define the application password
 APP_PASSWORD = "360estate"
 
-# --- Application Routes ---
+# --- Routes for the application ---
 
 @app.route('/')
 def index():
@@ -47,40 +46,40 @@ def login():
     """
     Handles the login form submission.
     Checks if the entered password matches the APP_PASSWORD.
-    If correct, redirects the user to the ad generator form.
+    If correct, redirects to the ad generator form.
     """
     password = request.form.get("password")
     if password == APP_PASSWORD:
-        # Redirect to the ad generator page after successful login
+        # Redirect to a new route after successful login
         return redirect(url_for('ad_generator'))
     else:
         # If password is incorrect, re-render the login page with an error message
         return render_template('login.html', error=True)
 
-@app.route('/ad_generator')
+@app.route('/ad_generator') # Route for the ad generation form
 def ad_generator():
     """
     Renders the main form for generating ads.
-    This route is accessed after a successful login.
+    Accessed after successful login.
     """
     return render_template('form.html')
+
 
 @app.route('/generate', methods=['POST'])
 def generate_ad():
     """
     Handles the ad generation form submission.
-    - Extracts data from the form, including base64 encoded images.
-    - Constructs a detailed multimodal prompt for the AI based on all input data.
+    - Extracts data from the form.
+    - Constructs a detailed multimodal prompt for the AI based on form data and image data.
     - Calls OpenAI API (GPT-4o) to generate two versions of the ad text (short and long).
-    - Returns the generated ad texts as a JSON response to the frontend.
+    - Returns the generated ad texts as a JSON response.
     """
     print("DEBUG: generate_ad route hit!")
 
-    # Parse JSON data sent from the frontend
-    # Frontend sends all form data and base64 images in a single JSON payload.
+    # Parse JSON data from the request
     data = request.json
     
-    # Extract text fields from the parsed JSON data
+    # Extract text fields
     form_data = {
         'property_type': data.get('property_type', 'Апартамент'), 
         'location': data.get('location', 'неуточнена'),
@@ -98,7 +97,7 @@ def generate_ad():
         'unique_features': data.get('unique_features', 'неуточнени'),
         'broker_name': data.get('broker_name', 'брокер'), 
         'broker_phone': data.get('broker_phone', 'неуточнен телефон'), 
-        # Specific fields for different property types (empty string if not provided)
+        # Specific fields for different property types
         'yard_area': data.get('yard_area', ''),
         'number_of_floors': data.get('number_of_floors', ''),
         'heating_system': data.get('heating_system', ''),
@@ -115,26 +114,29 @@ def generate_ad():
         'number_of_units': data.get('number_of_units', ''),
         'occupancy': data.get('occupancy', ''),
         'income_potential': data.get('income_potential', ''),
+        # 'existing_ad_url' field is removed from here
     }
 
-    # Extract base64 image data sent from the frontend
-    # These images are directly passed to AI Vision model, not saved on the server.
+    # Extract base64 image data (still used by AI for vision)
     image_data_base64 = data.get('images', [])
 
-    # Initialize ad output variables
     generated_short_ad = "Възникна грешка при генерирането на кратката обява."
     generated_long_ad = "Възникна грешка при генерирането на дългата обява."
     error_message = None
 
+    # Browsing logic is removed:
+    # browsed_content = ""
+    # if form_data['existing_ad_url']:
+    #     ... (removed browsing code) ...
+
     try:
-        # Check if OpenAI client was successfully initialized
         if client is None:
             raise ValueError("OpenAI клиентът не е инициализиран. API ключът може да липсва или да е невалиден.")
 
         print("DEBUG: OpenAI client is ready for vision model.")
 
-        # Construct the detailed prompt for the AI based on all input data and images.
-        # This prompt strictly adheres to the user's defined format, including specific sections and their order.
+        # Construct basic text prompt based on property type and all available data
+        # Prompt is reverted to prior version that doesn't prioritize browsed content.
         base_text_prompt = f"""
 Ти си експерт по имотни обяви и маркетинг за недвижими и имоти. Твоята задача е да създадеш ДВЕ ВЕРСИИ на обява за продажба на имот, съобразена с Facebook Marketplace. Всяка обява трябва да следва стриктно дефинираните секции и техния ред.
 
